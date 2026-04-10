@@ -157,7 +157,7 @@ export default function PostsFeed() {
         onPress={() => router.push("/post/new-post")}
         activeOpacity={0.9}
       >
-        <Ionicons name="add" size={34} color="#FFFFFF" />
+        <Ionicons name="add" size={26} color="#FFFFFF" />
       </TouchableOpacity>
     </View>
   );
@@ -261,16 +261,16 @@ const styles = StyleSheet.create({
   fab: {
     position: "absolute",
     right: 20,
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     backgroundColor: GREEN,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: GREEN,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.28,
-    shadowRadius: 18,
-    elevation: 9,
+    shadowRadius: 12,
+    elevation: 7,
   },
 });

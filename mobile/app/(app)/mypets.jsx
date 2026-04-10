@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -12,11 +13,112 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 
-import Spacer from "../../components/Spacer";
 import ThemedText from "../../components/ThemedText";
-import ThemedView from "../../components/ThemedView";
 import { useUser } from "../../contexts/UserContext";
 import { deletePet, getPetsByOwner } from "../../services/petService";
+
+const GREEN = "#3DB85C";
+
+function formatAge(dateValue) {
+  if (!dateValue) return null;
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return null;
+  const diff = Date.now() - date.getTime();
+  const day = 86400000;
+  if (diff >= 365 * day) return `${Math.max(1, Math.floor(diff / (365 * day)))} year${Math.floor(diff / (365 * day)) === 1 ? "" : "s"}`;
+  if (diff >= 30 * day) return `${Math.max(1, Math.floor(diff / (30 * day)))} month${Math.floor(diff / (30 * day)) === 1 ? "" : "s"}`;
+  return "< 1 month";
+}
+
+function typeIcon(type) {
+  const t = (type || "").toLowerCase();
+  if (t.includes("cat")) return "cat";
+  if (t.includes("dog")) return "paw";
+  if (t.includes("bird")) return "feather";
+  return "paw";
+}
+
+function genderIcon(gender) {
+  const g = (gender || "").toLowerCase();
+  if (g.includes("female") || g === "f") return "female";
+  if (g.includes("male") || g === "m") return "male";
+  return "male-female";
+}
+
+function capitalize(str) {
+  if (!str) return "";
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
+function PetRow({ item, onDelete }) {
+  const petId = item?._id || item?.id;
+  const imageUri = item?.image || "https://via.placeholder.com/200x200.png?text=Pet";
+  const age = formatAge(item?.date);
+  const gender = capitalize(item?.gender);
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.88}
+      style={styles.card}
+      onPress={() => petId && router.push(`/pet/${petId}`)}
+    >
+      <Image source={{ uri: imageUri }} style={styles.cardImage} />
+
+      <View style={styles.cardInfo}>
+        {/* Name + type badge */}
+        <View style={styles.nameRow}>
+          <ThemedText style={styles.petName} numberOfLines={1}>
+            {item?.name || "Unnamed"}
+          </ThemedText>
+          <View style={styles.typeBadge}>
+            <Ionicons name={typeIcon(item?.type)} size={12} color={GREEN} />
+            <ThemedText style={styles.typeBadgeText}>
+              {capitalize(item?.type) || "Pet"}
+            </ThemedText>
+          </View>
+        </View>
+
+        {/* Breed */}
+        <ThemedText style={styles.breed} numberOfLines={1}>
+          {item?.breed || "Unknown breed"}
+        </ThemedText>
+
+        {/* Gender + age */}
+        <View style={styles.metaRow}>
+          {!!gender && (
+            <>
+              <Ionicons name={genderIcon(item?.gender)} size={13} color="#8E9B93" />
+              <ThemedText style={styles.metaText}>{gender}</ThemedText>
+            </>
+          )}
+          {!!age && (
+            <>
+              <Ionicons name="time-outline" size={13} color="#8E9B93" style={styles.metaGap} />
+              <ThemedText style={styles.metaText}>{age}</ThemedText>
+            </>
+          )}
+        </View>
+
+        {/* Vaccinated badge */}
+        {item?.vaccinated && (
+          <View style={styles.vaccBadge}>
+            <Ionicons name="shield-checkmark" size={12} color={GREEN} />
+            <ThemedText style={styles.vaccText}>Vaccinated</ThemedText>
+          </View>
+        )}
+      </View>
+
+      {/* Edit button */}
+      <TouchableOpacity
+        style={styles.editBtn}
+        activeOpacity={0.7}
+        onPress={() => petId && router.push(`/pet/${petId}/edit`)}
+      >
+        <Ionicons name="create-outline" size={20} color="#B0BAB5" />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+}
 
 export default function MyPetsScreen() {
   const { user } = useUser();
@@ -29,7 +131,6 @@ export default function MyPetsScreen() {
   const [pets, setPets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
 
   const loadMyPets = useCallback(async () => {
     if (!userId) {
@@ -38,13 +139,11 @@ export default function MyPetsScreen() {
       setRefreshing(false);
       return;
     }
-
     try {
       const data = await getPetsByOwner(userId);
       setPets(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error loading my pets:", error);
-      Alert.alert("Error", "Failed to load your pets");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -57,299 +156,239 @@ export default function MyPetsScreen() {
     }, [loadMyPets])
   );
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadMyPets();
-  };
-
-  const handleDeletePet = (petId) => {
-    Alert.alert("Delete pet", "Are you sure you want to delete this pet?", [
+  const handleDelete = (petId) => {
+    Alert.alert("Delete Pet", "Are you sure you want to delete this pet?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
         style: "destructive",
         onPress: async () => {
           try {
-            setDeletingId(petId);
             await deletePet(petId);
-            setPets((prev) => prev.filter((item) => item._id !== petId));
-          } catch (error) {
-            console.error("Error deleting pet:", error);
+            setPets((prev) => prev.filter((p) => (p._id || p.id) !== petId));
+          } catch {
             Alert.alert("Error", "Failed to delete pet");
-          } finally {
-            setDeletingId(null);
           }
         },
       },
     ]);
   };
 
-  const renderPetCard = ({ item }) => {
-    const petId = item?._id || item?.id;
-    const imageUri =
-      item?.image || "https://via.placeholder.com/400x400.png?text=Pet";
-
-    return (
-      <TouchableOpacity
-        activeOpacity={0.9}
-        style={styles.card}
-        onPress={() => {
-          if (petId) {
-            router.push(`/pet/${petId}`);
-          }
-        }}
-      >
-        <Image source={{ uri: imageUri }} style={styles.cardImage} />
-
-        <View style={styles.cardContent}>
-          <ThemedText style={styles.cardTitle}>
-            {item?.name || "Unnamed"}
-          </ThemedText>
-
-          <ThemedText style={styles.cardSubtitle}>
-            {item?.type || "Pet"} | {item?.breed || "Unknown"}
-          </ThemedText>
-
-          {!!item?.description && (
-            <ThemedText style={styles.cardDescription} numberOfLines={2}>
-              {item.description}
-            </ThemedText>
-          )}
-
-          <View style={styles.cardActions}>
-            <TouchableOpacity
-              style={styles.viewButton}
-              onPress={() => {
-                if (petId) {
-                  router.push(`/pet/${petId}`);
-                }
-              }}
-            >
-              <ThemedText style={styles.viewButtonText}>View</ThemedText>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={() => handleDeletePet(petId)}
-              disabled={deletingId === petId}
-            >
-              <ThemedText style={styles.deleteButtonText}>
-                {deletingId === petId ? "Deleting..." : "Delete"}
-              </ThemedText>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={["top"]}>
-        <ThemedView style={styles.center}>
-          <ActivityIndicator size="large" />
-        </ThemedView>
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={GREEN} />
+        </View>
       </SafeAreaView>
     );
   }
 
   if (!userId) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={["top"]}>
-        <ThemedView style={styles.center}>
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <View style={styles.center}>
           <ThemedText>You need to be logged in to see your pets.</ThemedText>
-        </ThemedView>
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <ThemedView style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.headerTextBlock}>
-            <ThemedText type="title" style={styles.title}>
-              My Pets
-            </ThemedText>
-            <ThemedText style={styles.subtitle}>
-              View and manage the pets you own
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <FlatList
+        data={pets}
+        keyExtractor={(item, i) => item?._id || item?.id || String(i)}
+        renderItem={({ item }) => (
+          <PetRow item={item} onDelete={handleDelete} />
+        )}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); loadMyPets(); }}
+            tintColor={GREEN}
+          />
+        }
+        ListHeaderComponent={
+          <View style={styles.pageHeader}>
+            <View>
+              <ThemedText style={styles.pageTitle}>My Pets</ThemedText>
+              <ThemedText style={styles.pageSubtitle}>
+                {pets.length} pet{pets.length !== 1 ? "s" : ""} registered
+              </ThemedText>
+            </View>
+            <TouchableOpacity
+              style={styles.addBtn}
+              activeOpacity={0.85}
+              onPress={() => router.push("/pet/new-pet")}
+            >
+              <Ionicons name="add" size={26} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons name="paw-outline" size={40} color={GREEN} />
+            <ThemedText style={styles.emptyTitle}>No pets yet</ThemedText>
+            <ThemedText style={styles.emptyText}>
+              Tap the + button to add your first pet profile.
             </ThemedText>
           </View>
-
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => router.push("/pet/new-pet")}
-          >
-            <ThemedText style={styles.addButtonText}>+ Add Pet</ThemedText>
-          </TouchableOpacity>
-        </View>
-
-        <Spacer height={16} />
-
-        <FlatList
-          data={pets}
-          keyExtractor={(item, index) => item?._id || item?.id || `${index}`}
-          renderItem={renderPetCard}
-          contentContainerStyle={[
-            styles.listContent,
-            pets.length === 0 && styles.emptyListContent,
-          ]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <ThemedText style={styles.emptyTitle}>
-                You have no pets yet
-              </ThemedText>
-              <ThemedText style={styles.emptyText}>
-                Tap "Add Pet" to create your first pet profile.
-              </ThemedText>
-              <Spacer height={16} />
-              <TouchableOpacity
-                style={styles.emptyAction}
-                onPress={() => router.push("/pet/new-pet")}
-              >
-                <ThemedText style={styles.emptyActionText}>
-                  Add your first pet
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-          }
-        />
-      </ThemedView>
+        }
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  safe: {
     flex: 1,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 10,
+    backgroundColor: "#F4F6F4",
   },
   center: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 24,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-  },
-  headerTextBlock: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 24,
-  },
-  subtitle: {
-    marginTop: 4,
-    opacity: 0.7,
-    fontSize: 14,
-  },
-  addButton: {
-    backgroundColor: "#222",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  addButtonText: {
-    color: "#fff",
-    fontWeight: "700",
   },
   listContent: {
-    paddingBottom: 24,
+    paddingHorizontal: 16,
+    paddingBottom: 40,
   },
-  emptyListContent: {
-    flexGrow: 1,
+  pageHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 20,
+  },
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#131F17",
+    letterSpacing: -0.4,
+  },
+  pageSubtitle: {
+    marginTop: 3,
+    fontSize: 14,
+    color: "#8E9B93",
+  },
+  addBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: GREEN,
+    alignItems: "center",
     justifyContent: "center",
+    shadowColor: GREEN,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
+    shadowColor: "#1A3028",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardImage: {
+    width: 78,
+    height: 78,
+    borderRadius: 14,
+    backgroundColor: "#E6EDE8",
+  },
+  cardInfo: {
+    flex: 1,
+    paddingLeft: 14,
+    paddingRight: 4,
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 3,
+  },
+  petName: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#131F17",
+    flexShrink: 1,
+  },
+  typeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: GREEN,
+    backgroundColor: "#F0FAF3",
+  },
+  typeBadgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: GREEN,
+  },
+  breed: {
+    fontSize: 13,
+    color: "#8E9B93",
+    marginBottom: 5,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    flexWrap: "wrap",
+    marginBottom: 6,
+  },
+  metaText: {
+    fontSize: 12,
+    color: "#8E9B93",
+  },
+  metaGap: {
+    marginLeft: 8,
+  },
+  vaccBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 20,
+    backgroundColor: "#E8F8EE",
+  },
+  vaccText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: GREEN,
+  },
+  editBtn: {
+    padding: 6,
   },
   emptyState: {
     alignItems: "center",
-    padding: 24,
-  },
-  emptyTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  emptyText: {
-    fontSize: 15,
-    opacity: 0.7,
-    textAlign: "center",
-  },
-  emptyAction: {
-    backgroundColor: "#222",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  emptyActionText: {
-    color: "#fff",
-    fontWeight: "700",
-  },
-  card: {
-    borderRadius: 18,
-    overflow: "hidden",
-    backgroundColor: "#f5f5f5",
-    marginBottom: 14,
-  },
-  cardImage: {
-    width: "100%",
-    height: 210,
-    backgroundColor: "#e9e9e9",
-  },
-  cardContent: {
-    padding: 14,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    opacity: 0.7,
-    marginBottom: 10,
-  },
-  cardDescription: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  cardActions: {
-    flexDirection: "row",
+    paddingTop: 60,
     gap: 10,
   },
-  viewButton: {
-    flex: 1,
-    backgroundColor: "#222",
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  viewButtonText: {
-    color: "#fff",
+  emptyTitle: {
+    fontSize: 20,
     fontWeight: "700",
+    color: "#2C3A31",
   },
-  deleteButton: {
-    flex: 1,
-    backgroundColor: "#fbe4e7",
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  deleteButtonText: {
-    color: "#c0392b",
-    fontWeight: "700",
+  emptyText: {
+    fontSize: 14,
+    color: "#8E9B93",
+    textAlign: "center",
+    lineHeight: 20,
   },
 });

@@ -65,8 +65,14 @@ export const UserProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    setUser(null);
+  const logout = async () => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.log("Logout error:", error?.message || error);
+    } finally {
+      setUser(null);
+    }
   };
 
   const value = useMemo(

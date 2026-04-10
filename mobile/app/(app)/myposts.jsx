@@ -1,7 +1,9 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
@@ -10,11 +12,150 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
-import ThemedView from "../../components/ThemedView";
 import ThemedText from "../../components/ThemedText";
-import PostCard from "../../components/home/PostCard";
 import { useUser } from "../../contexts/UserContext";
 import { getPostsByUser } from "../../services/postService";
+
+const GREEN = "#3DB85C";
+
+function formatDate(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function capitalize(str) {
+  if (!str) return "";
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
+const STATUS_STYLES = {
+  active: { bg: "#E8F8EE", text: GREEN },
+  approved: { bg: "#E8F8EE", text: GREEN },
+  pending: { bg: "#FFF3E0", text: "#E07B00" },
+  rejected: { bg: "#FEECEC", text: "#D63031" },
+  closed: { bg: "#F0F0F0", text: "#888" },
+};
+
+function statusStyle(status) {
+  return STATUS_STYLES[(status || "").toLowerCase()] || { bg: "#F0F0F0", text: "#888" };
+}
+
+const TYPE_COLORS = {
+  adoption: GREEN,
+  found: "#3DB85C",
+  lost: "#E05B5B",
+  mating: "#9B59B6",
+  general: "#5B8FE0",
+};
+
+function typeColor(type) {
+  return TYPE_COLORS[(type || "").toLowerCase()] || GREEN;
+}
+
+function PostRow({ item }) {
+  const postId = item?._id || item?.id;
+  const imageUri =
+    item?.image ||
+    item?.images?.[0] ||
+    "https://via.placeholder.com/200x200.png?text=Post";
+
+  const sStyle = statusStyle(item?.status);
+  const tColor = typeColor(item?.type);
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.88}
+      style={styles.card}
+      onPress={() => postId && router.push(`/post/${postId}`)}
+    >
+      <Image source={{ uri: imageUri }} style={styles.cardImage} />
+
+      <View style={styles.cardInfo}>
+        {/* Title */}
+        <ThemedText style={styles.postTitle} numberOfLines={2}>
+          {item?.title || "Untitled Post"}
+        </ThemedText>
+
+        {/* Tags */}
+        <View style={styles.tagsRow}>
+          {!!item?.type && (
+            <View
+              style={[
+                styles.tag,
+                { borderColor: tColor, backgroundColor: "#F5FDF7" },
+              ]}
+            >
+              <ThemedText style={[styles.tagText, { color: tColor }]}>
+                {capitalize(item.type)}
+              </ThemedText>
+            </View>
+          )}
+          {!!item?.status && (
+            <View
+              style={[
+                styles.statusTag,
+                { backgroundColor: sStyle.bg },
+              ]}
+            >
+              <ThemedText style={[styles.statusTagText, { color: sStyle.text }]}>
+                {capitalize(item.status)}
+              </ThemedText>
+            </View>
+          )}
+        </View>
+
+        {/* Bottom row: likes + date */}
+        <View style={styles.bottomRow}>
+          <View style={styles.likesBlock}>
+            <Ionicons name="heart" size={13} color="#E05555" />
+            <ThemedText style={styles.likesText}>
+              {item?.likes_count || 0} likes
+            </ThemedText>
+          </View>
+          <ThemedText style={styles.dateText}>
+            {formatDate(item?.createdAt)}
+          </ThemedText>
+        </View>
+      </View>
+
+      {/* 3-dot menu */}
+      <TouchableOpacity style={styles.menuBtn} activeOpacity={0.7}>
+        <Ionicons name="ellipsis-vertical" size={18} color="#B0BAB5" />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+}
+
+function StatsRow({ posts }) {
+  const total = posts.length;
+  const active = posts.filter(
+    (p) => (p?.status || "").toLowerCase() === "active" || (p?.status || "").toLowerCase() === "approved"
+  ).length;
+  const likes = posts.reduce((sum, p) => sum + (p?.likes_count || 0), 0);
+
+  const stats = [
+    { value: total, label: "Total" },
+    { value: active, label: "Active" },
+    { value: likes, label: "Likes" },
+  ];
+
+  return (
+    <View style={styles.statsRow}>
+      {stats.map((s, i) => (
+        <View key={s.label} style={[styles.statBox, i < stats.length - 1 && styles.statBoxBorder]}>
+          <ThemedText style={styles.statValue}>{s.value}</ThemedText>
+          <ThemedText style={styles.statLabel}>{s.label}</ThemedText>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 export default function MyPosts() {
   const { user } = useUser();
@@ -35,7 +176,6 @@ export default function MyPosts() {
       setRefreshing(false);
       return;
     }
-
     try {
       const data = await getPostsByUser(userId);
       setPosts(Array.isArray(data) ? data : []);
@@ -51,111 +191,235 @@ export default function MyPosts() {
     loadMyPosts();
   }, [loadMyPosts]);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadMyPosts();
-  };
-
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={["top"]}>
-        <ThemedView style={styles.center}>
-          <ActivityIndicator size="large" />
-        </ThemedView>
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={GREEN} />
+        </View>
       </SafeAreaView>
     );
   }
 
   if (!userId) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={["top"]}>
-        <ThemedView style={styles.center}>
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <View style={styles.center}>
           <ThemedText>You need to be logged in to see your posts.</ThemedText>
-        </ThemedView>
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <ThemedView style={styles.container}>
-        <View style={styles.header}>
-          <ThemedText type="title">My Posts</ThemedText>
-
-          <TouchableOpacity
-            style={styles.newPostButton}
-            onPress={() => router.push("/post/new-post")}
-          >
-            <ThemedText style={styles.newPostButtonText}>+ New Post</ThemedText>
-          </TouchableOpacity>
-        </View>
-
-        <FlatList
-          data={posts}
-          keyExtractor={(item) => item._id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => router.push(`/post/${item._id}`)}
-            >
-              <PostCard post={item} />
-            </TouchableOpacity>
-          )}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          contentContainerStyle={[
-            styles.listContent,
-            posts.length === 0 && styles.emptyListContent,
-          ]}
-          ListEmptyComponent={
-            <View style={styles.center}>
-              <ThemedText>You have not created any posts yet.</ThemedText>
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <FlatList
+        data={posts}
+        keyExtractor={(item) => item._id || item.id}
+        renderItem={({ item }) => <PostRow item={item} />}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadMyPosts();
+            }}
+            tintColor={GREEN}
+          />
+        }
+        contentContainerStyle={styles.listContent}
+        ListHeaderComponent={
+          <>
+            <View style={styles.pageHeader}>
+              <ThemedText style={styles.pageTitle}>My Posts</ThemedText>
+              <TouchableOpacity
+                style={styles.addBtn}
+                activeOpacity={0.85}
+                onPress={() => router.push("/post/new-post")}
+              >
+                <Ionicons name="add" size={26} color="#FFFFFF" />
+              </TouchableOpacity>
             </View>
-          }
-        />
-      </ThemedView>
+            {posts.length > 0 && <StatsRow posts={posts} />}
+          </>
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons name="document-text-outline" size={40} color={GREEN} />
+            <ThemedText style={styles.emptyTitle}>No posts yet</ThemedText>
+            <ThemedText style={styles.emptyText}>
+              Tap the + button to create your first post.
+            </ThemedText>
+          </View>
+        }
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  safe: {
     flex: 1,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 10,
+    backgroundColor: "#F4F6F4",
   },
   center: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 24,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-    gap: 12,
-  },
-  newPostButton: {
-    backgroundColor: "#4CAF50",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  newPostButtonText: {
-    color: "#fff",
-    fontWeight: "700",
   },
   listContent: {
-    paddingBottom: 24,
+    paddingHorizontal: 16,
+    paddingBottom: 40,
   },
-  emptyListContent: {
-    flexGrow: 1,
+  pageHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 20,
+  },
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#131F17",
+    letterSpacing: -0.4,
+  },
+  addBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: GREEN,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: GREEN,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  statsRow: {
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    marginBottom: 18,
+    shadowColor: "#1A3028",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 2,
+    overflow: "hidden",
+  },
+  statBox: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 16,
+  },
+  statBoxBorder: {
+    borderRightWidth: 1,
+    borderRightColor: "#EEF2EF",
+  },
+  statValue: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: GREEN,
+  },
+  statLabel: {
+    fontSize: 13,
+    color: "#8E9B93",
+    marginTop: 2,
+  },
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
+    shadowColor: "#1A3028",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardImage: {
+    width: 78,
+    height: 78,
+    borderRadius: 14,
+    backgroundColor: "#E6EDE8",
+  },
+  cardInfo: {
+    flex: 1,
+    paddingLeft: 14,
+    paddingRight: 4,
+    gap: 5,
+  },
+  postTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#131F17",
+    lineHeight: 22,
+  },
+  tagsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexWrap: "wrap",
+  },
+  tag: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1.5,
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  statusTag: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  statusTagText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  bottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 2,
+  },
+  likesBlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  likesText: {
+    fontSize: 13,
+    color: "#8E9B93",
+  },
+  dateText: {
+    fontSize: 12,
+    color: "#A8B4AD",
+  },
+  menuBtn: {
+    padding: 6,
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingTop: 60,
+    gap: 10,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#2C3A31",
+  },
+  emptyText: {
+    fontSize: 14,
+    color: "#8E9B93",
+    textAlign: "center",
+    lineHeight: 20,
   },
 });

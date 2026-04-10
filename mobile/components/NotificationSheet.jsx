@@ -32,6 +32,21 @@ const notificationStyles = {
     iconColor: GREEN,
     iconBackground: "#EAF8EE",
   },
+  match: {
+    icon: "paw",
+    iconColor: GREEN,
+    iconBackground: "#EAF8EE",
+  },
+  alert: {
+    icon: "location",
+    iconColor: "#F28A1D",
+    iconBackground: "#FFF3E2",
+  },
+  status: {
+    icon: "checkmark-circle",
+    iconColor: "#2B7CDB",
+    iconBackground: "#EAF2FF",
+  },
   system: {
     icon: "notifications",
     iconColor: "#F28A1D",
@@ -88,11 +103,12 @@ export default function NotificationSheet({
   onClose,
   onMarkAllRead,
   onPressNotification,
+  error,
 }) {
   return (
     <Modal
       visible={visible}
-      animationType="fade"
+      animationType="slide"
       transparent
       statusBarTranslucent
       onRequestClose={onClose}
@@ -104,6 +120,7 @@ export default function NotificationSheet({
           <View style={styles.sheet}>
             <View style={styles.handle} />
 
+            {/* Header */}
             <View style={styles.headerRow}>
               <View style={styles.headerTextBlock}>
                 <ThemedText style={styles.title}>Notifications</ThemedText>
@@ -113,47 +130,53 @@ export default function NotificationSheet({
               </View>
 
               <View style={styles.headerActions}>
-                <TouchableOpacity
-                  style={[
-                    styles.readAllButton,
-                    unreadCount === 0 && styles.readAllButtonDisabled,
-                  ]}
-                  activeOpacity={0.85}
-                  onPress={onMarkAllRead}
-                  disabled={unreadCount === 0}
-                >
-                  <Ionicons name="checkmark-done" size={18} color={GREEN} />
-                  <ThemedText style={styles.readAllText}>All read</ThemedText>
-                </TouchableOpacity>
+                {notifications.length > 0 && (
+                  <TouchableOpacity
+                    style={[
+                      styles.readAllButton,
+                      unreadCount === 0 && styles.readAllButtonDisabled,
+                    ]}
+                    activeOpacity={0.85}
+                    onPress={onMarkAllRead}
+                    disabled={unreadCount === 0}
+                  >
+                    <Ionicons name="checkmark-done" size={16} color={GREEN} />
+                    <ThemedText style={styles.readAllText}>All read</ThemedText>
+                  </TouchableOpacity>
+                )}
 
                 <TouchableOpacity
                   style={styles.closeButton}
                   onPress={onClose}
                   activeOpacity={0.85}
                 >
-                  <Ionicons name="close" size={22} color="#707773" />
+                  <Ionicons name="close" size={20} color="#707773" />
                 </TouchableOpacity>
               </View>
             </View>
 
+            {/* Body */}
             {loading ? (
-              <View style={styles.loadingState}>
+              <View style={styles.centeredState}>
                 <ActivityIndicator size="large" color={GREEN} />
+                <ThemedText style={styles.stateHint}>Loading…</ThemedText>
+              </View>
+            ) : error ? (
+              <View style={styles.centeredState}>
+                <View style={[styles.stateIcon, { backgroundColor: "#FFF0F0" }]}>
+                  <Ionicons name="alert-circle-outline" size={28} color="#D94F4F" />
+                </View>
+                <ThemedText style={styles.stateTitle}>Couldn't load notifications</ThemedText>
+                <ThemedText style={styles.stateHint}>Pull to refresh or try again later.</ThemedText>
               </View>
             ) : notifications.length === 0 ? (
-              <View style={styles.emptyState}>
-                <View style={styles.emptyIcon}>
-                  <Ionicons
-                    name="notifications-outline"
-                    size={26}
-                    color={GREEN}
-                  />
+              <View style={styles.centeredState}>
+                <View style={styles.stateIcon}>
+                  <Ionicons name="notifications-outline" size={28} color={GREEN} />
                 </View>
-                <ThemedText style={styles.emptyTitle}>
-                  No notifications yet
-                </ThemedText>
-                <ThemedText style={styles.emptyText}>
-                  Likes, comments, and messages will show up here.
+                <ThemedText style={styles.stateTitle}>No notifications yet</ThemedText>
+                <ThemedText style={styles.stateHint}>
+                  Likes, comments, and messages{"\n"}will show up here.
                 </ThemedText>
               </View>
             ) : (
@@ -182,7 +205,7 @@ export default function NotificationSheet({
                       >
                         <Ionicons
                           name={palette.icon}
-                          size={24}
+                          size={22}
                           color={palette.iconColor}
                         />
                       </View>
@@ -196,7 +219,9 @@ export default function NotificationSheet({
                         </ThemedText>
                       </View>
 
-                      {!notification?.isRead ? <View style={styles.unreadDot} /> : null}
+                      {!notification?.isRead ? (
+                        <View style={styles.unreadDot} />
+                      ) : null}
                     </TouchableOpacity>
                   );
                 })}
@@ -227,8 +252,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 32,
     paddingHorizontal: 18,
     paddingTop: 10,
-    paddingBottom: 10,
-    maxHeight: "78%",
+    paddingBottom: 24,
+    maxHeight: "80%",
+    minHeight: 320,
   },
   handle: {
     alignSelf: "center",
@@ -265,61 +291,58 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   readAllButton: {
-    height: 46,
-    borderRadius: 23,
-    borderWidth: 2,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1.5,
     borderColor: GREEN,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
     backgroundColor: "#F8FFF9",
   },
   readAllButtonDisabled: {
-    opacity: 0.45,
+    opacity: 0.4,
   },
   readAllText: {
     color: GREEN,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "700",
   },
   closeButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: "#F6F7F6",
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#F3F5F3",
     alignItems: "center",
     justifyContent: "center",
   },
-  loadingState: {
-    paddingVertical: 36,
+  centeredState: {
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 28,
+    paddingHorizontal: 24,
   },
-  emptyState: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 34,
-  },
-  emptyIcon: {
-    width: 62,
-    height: 62,
-    borderRadius: 20,
+  stateIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: GREEN_LIGHT,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 14,
   },
-  emptyTitle: {
-    fontSize: 18,
+  stateTitle: {
+    fontSize: 17,
     fontWeight: "700",
-    color: "#223129",
+    color: "#1E2B22",
     marginBottom: 6,
-  },
-  emptyText: {
     textAlign: "center",
-    color: "#78837D",
+  },
+  stateHint: {
+    fontSize: 14,
+    textAlign: "center",
+    color: "#7E8C84",
     lineHeight: 21,
   },
   listContent: {
@@ -342,9 +365,9 @@ const styles = StyleSheet.create({
     borderColor: "#D6EFDC",
   },
   notificationIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 18,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: "center",
     justifyContent: "center",
   },

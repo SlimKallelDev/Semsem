@@ -38,14 +38,14 @@ export function LocationFilterProvider({ children }) {
 
   const selectionLabel = useMemo(() => {
     if (mode === "worldwide") {
-      return "In All the World";
+      return "All over the world";
     }
 
     if (mode === "place") {
       return (
         [selectedCity.trim(), selectedCountry.trim()]
           .filter(Boolean)
-          .join(", ") || "Specific Place"
+          .join(", ") || "Country / City"
       );
     }
 
@@ -54,18 +54,18 @@ export function LocationFilterProvider({ children }) {
 
   const helperText = useMemo(() => {
     if (mode === "worldwide") {
-      return "Showing posts and pets from every region";
+      return "Browse all posts globally";
     }
 
     if (mode === "place") {
-      return "Using your selected city or country";
+      return "Filter by country or city";
     }
 
     if (nearbySummary) {
-      return `Using ${nearbySummary}`;
+      return `Posts around ${nearbySummary}`;
     }
 
-    return "Uses your profile location when available";
+    return "Posts around your location";
   }, [mode, nearbySummary]);
 
   const value = useMemo(
