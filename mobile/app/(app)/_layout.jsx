@@ -45,15 +45,6 @@ function FloatingHomeTabButton({
       >
         <Ionicons name="home" size={27} color="#FFFFFF" />
       </View>
-
-      <Text
-        style={[
-          styles.homeTabLabel,
-          focused && styles.homeTabLabelActive,
-        ]}
-      >
-        Home
-      </Text>
     </TouchableOpacity>
   );
 }
@@ -64,6 +55,7 @@ export default function AppLayout() {
   const [sheetVisible, setSheetVisible] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsError, setNotificationsError] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
   const isLoggedIn = !!user;
@@ -105,6 +97,7 @@ export default function AppLayout() {
 
     try {
       setNotificationsLoading(true);
+      setNotificationsError(false);
 
       const data = await getNotifications();
       const items = Array.isArray(data) ? data : [];
@@ -113,6 +106,7 @@ export default function AppLayout() {
       syncUnreadCount(items);
     } catch (error) {
       console.log("Load notifications error:", error.message);
+      setNotificationsError(true);
     } finally {
       setNotificationsLoading(false);
     }
@@ -240,27 +234,26 @@ export default function AppLayout() {
   const renderProfileButton = () => {
     if (user) {
       return (
-        <TouchableOpacity
-          onPress={() => router.push("/profile")}
-          style={styles.profileButton}
-          activeOpacity={0.85}
-        >
-          <Image source={{ uri: userAvatar }} style={styles.profileImage} />
+        <View style={styles.btnWrap}>
+          <TouchableOpacity
+            onPress={() => router.push("/profile")}
+            style={styles.iconButton}
+            activeOpacity={0.85}
+          >
+            <Image source={{ uri: userAvatar }} style={styles.profileImage} />
+          </TouchableOpacity>
           <View style={styles.profileDot} />
-        </TouchableOpacity>
+        </View>
       );
     }
 
     return (
       <TouchableOpacity
         onPress={() => router.push("/(auth)/login")}
-        style={styles.profileButton}
-        activeOpacity={0.85}
+        style={styles.loginButton}
+        activeOpacity={0.82}
       >
-        <View style={styles.profileFallback}>
-          <Ionicons name="person" size={20} color="#FFFFFF" />
-        </View>
-        <View style={styles.profileDot} />
+        <Text style={styles.loginButtonText}>Login</Text>
       </TouchableOpacity>
     );
   };
@@ -275,20 +268,20 @@ export default function AppLayout() {
             tabBarStyle: {
               backgroundColor: "#FFFFFF",
               borderTopColor: "#E9E9E9",
-              height: 76,
-              paddingTop: 4,
-              paddingBottom: 8,
+              height: 84,
+              paddingTop: 6,
+              paddingBottom: 14,
             },
             tabBarLabelStyle: {
               fontSize: 11,
-              fontWeight: "500",
-              marginTop: 1,
+              fontWeight: "600",
+              marginTop: 2,
             },
             tabBarIconStyle: {
               marginTop: 2,
             },
             tabBarItemStyle: {
-              paddingTop: 4,
+              paddingTop: 2,
             },
             headerShown: true,
             headerTitle: "",
@@ -309,21 +302,22 @@ export default function AppLayout() {
             headerRight: () => (
               <View style={styles.headerActions}>
                 {isLoggedIn ? (
-                  <TouchableOpacity
-                    onPress={openNotifications}
-                    style={styles.notificationButton}
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons
-                      name={
-                        unreadCount > 0
-                          ? "notifications"
-                          : "notifications-outline"
-                      }
-                      size={26}
-                      color="#252B27"
-                    />
-
+                  <View style={styles.btnWrap}>
+                    <TouchableOpacity
+                      onPress={openNotifications}
+                      style={[styles.iconButton, styles.iconButtonBell]}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons
+                        name={
+                          unreadCount > 0
+                            ? "notifications"
+                            : "notifications-outline"
+                        }
+                        size={22}
+                        color="#2E3830"
+                      />
+                    </TouchableOpacity>
                     {unreadCount > 0 ? (
                       <View style={styles.notificationBadge}>
                         <Text style={styles.notificationBadgeText}>
@@ -331,7 +325,7 @@ export default function AppLayout() {
                         </Text>
                       </View>
                     ) : null}
-                  </TouchableOpacity>
+                  </View>
                 ) : null}
 
                 {renderProfileButton()}
@@ -417,6 +411,7 @@ export default function AppLayout() {
           loading={notificationsLoading}
           notifications={notifications}
           unreadCount={unreadCount}
+          error={notificationsError}
           onClose={closeNotifications}
           onMarkAllRead={handleMarkAllRead}
           onPressNotification={handleNotificationPress}
@@ -458,41 +453,61 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
-  notificationButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#FBFBFB",
+  btnWrap: {
+    position: "relative",
+  },
+  iconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#F0F0F0",
+    borderColor: "#E8ECE9",
     alignItems: "center",
     justifyContent: "center",
-    position: "relative",
+    overflow: "hidden",
     shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
     elevation: 2,
+  },
+  iconButtonBell: {
+    overflow: "visible",
+  },
+  loginButton: {
+    height: 34,
+    paddingHorizontal: 16,
+    borderRadius: 17,
+    backgroundColor: "#E8E8E8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loginButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#444444",
   },
   notificationBadge: {
     position: "absolute",
-    top: -2,
-    right: -2,
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
+    top: -3,
+    right: -3,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: "#EE4545",
     borderWidth: 2,
     borderColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 4,
+    paddingHorizontal: 3,
+    zIndex: 2,
   },
   notificationBadgeText: {
     color: "#FFFFFF",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "800",
-    lineHeight: 12,
+    lineHeight: 11,
   },
   homeTabButton: {
     flex: 1,
@@ -522,45 +537,20 @@ const styles = StyleSheet.create({
     shadowColor: "#C8CCCA",
     shadowOpacity: 0.1,
   },
-  homeTabLabel: {
-    marginTop: 4,
-    fontSize: 11,
-    fontWeight: "600",
-    color: INACTIVE,
-  },
-  homeTabLabelActive: {
-    color: GREEN,
-  },
-  profileButton: {
-    position: "relative",
-  },
   profileImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-  },
-  profileFallback: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: GREEN,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: GREEN,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.24,
-    shadowRadius: 10,
-    elevation: 5,
+    width: 42,
+    height: 42,
   },
   profileDot: {
     position: "absolute",
-    right: 1,
-    bottom: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 3,
-    borderColor: GREEN,
+    right: -1,
+    bottom: -1,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: GREEN,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    zIndex: 2,
   },
 });

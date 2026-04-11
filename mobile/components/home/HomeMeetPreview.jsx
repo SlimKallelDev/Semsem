@@ -134,7 +134,7 @@ export default function HomeMeetPreview() {
                   />
 
                   <View style={styles.badge}>
-                    <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                    <Ionicons name="checkmark" size={11} color="#FFFFFF" />
                   </View>
 
                   <View style={styles.cardInfo}>
@@ -229,11 +229,11 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   loadingCard: {
-    width: 156,
-    height: 220,
-    borderRadius: 28,
+    width: 112,
+    height: 152,
+    borderRadius: 18,
     backgroundColor: "#E7F0EA",
-    marginRight: 14,
+    marginRight: 10,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -261,19 +261,19 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   cardWrap: {
-    marginRight: 14,
+    marginRight: 10,
   },
   card: {
-    width: 156,
-    height: 220,
-    borderRadius: 28,
+    width: 112,
+    height: 152,
+    borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "#DDE8E0",
     shadowColor: "#1A2E22",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
   },
   image: {
     width: "100%",
@@ -288,41 +288,41 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: "absolute",
-    top: 12,
-    right: 12,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: GREEN,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: "#FFFFFF",
   },
   cardInfo: {
     position: "absolute",
-    left: 14,
-    right: 14,
-    bottom: 14,
+    left: 10,
+    right: 10,
+    bottom: 10,
   },
   cardName: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "800",
     color: "#FFFFFF",
   },
   cardMeta: {
-    marginTop: 2,
-    fontSize: 13,
+    marginTop: 1,
+    fontSize: 11,
     color: "rgba(255,255,255,0.9)",
   },
   locationRow: {
-    marginTop: 6,
+    marginTop: 4,
     flexDirection: "row",
     alignItems: "center",
   },
   locationText: {
-    marginLeft: 4,
-    fontSize: 12,
+    marginLeft: 3,
+    fontSize: 10,
     color: "rgba(255,255,255,0.92)",
     flex: 1,
   },

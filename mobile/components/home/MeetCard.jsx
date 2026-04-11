@@ -6,37 +6,27 @@ import { Dimensions, Image, StyleSheet, TouchableOpacity, View } from "react-nat
 import ThemedText from "../ThemedText";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
-const CARD_GAP = 14;
+const CARD_GAP = 12;
 const HORIZONTAL_PADDING = 16;
 const CARD_WIDTH = (SCREEN_WIDTH - HORIZONTAL_PADDING * 2 - CARD_GAP) / 2;
-const CARD_HEIGHT = 286;
+const CARD_HEIGHT_TALL = 280;
+const CARD_HEIGHT_SHORT = 216;
 const GREEN = "#3DB85C";
 
+function getCardHeight(index) {
+  // Alternating pattern: tall-short / short-tall / tall-short …
+  const pos = index % 4;
+  return pos === 0 || pos === 3 ? CARD_HEIGHT_TALL : CARD_HEIGHT_SHORT;
+}
+
 function formatAge(dateValue) {
-  if (!dateValue) {
-    return "";
-  }
-
+  if (!dateValue) return "";
   const date = new Date(dateValue);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const day = 24 * 60 * 60 * 1000;
-  const year = 365 * day;
-  const month = 30 * day;
-
-  if (diff >= year) {
-    return `${Math.max(1, Math.floor(diff / year))}y`;
-  }
-
-  if (diff >= month) {
-    return `${Math.max(1, Math.floor(diff / month))}m`;
-  }
-
+  if (Number.isNaN(date.getTime())) return "";
+  const diff = Date.now() - date.getTime();
+  const day = 86400000;
+  if (diff >= 365 * day) return `${Math.max(1, Math.floor(diff / (365 * day)))}y`;
+  if (diff >= 30 * day) return `${Math.max(1, Math.floor(diff / (30 * day)))}m`;
   return "";
 }
 
@@ -50,47 +40,53 @@ function formatMeta(pet) {
   return `${type} \u2022 ${breed}`;
 }
 
-export default function MeetCard({ pet, isLastInRow }) {
+export default function MeetCard({ pet, index = 0, isLastInRow }) {
   if (!pet) return null;
 
   const petId = pet?._id || pet?.id;
   const age = formatAge(pet?.date);
   const location = formatLocation(pet);
+  const cardHeight = getCardHeight(index);
 
   return (
     <TouchableOpacity
       activeOpacity={0.92}
-      style={[styles.wrapper, isLastInRow && styles.lastInRow]}
-      onPress={() => {
-        if (petId) {
-          router.push(`/pet/${petId}`);
-        }
-      }}
+      style={[
+        styles.wrapper,
+        { height: cardHeight },
+        isLastInRow && styles.lastInRow,
+      ]}
+      onPress={() => petId && router.push(`/pet/${petId}`)}
     >
       <View style={styles.card}>
         <Image
           source={{
-            uri: pet?.image || "https://via.placeholder.com/400x400.png?text=Pet",
+            uri: pet?.image || "https://via.placeholder.com/400x600.png?text=Pet",
           }}
           style={styles.image}
+          resizeMode="cover"
         />
 
         <LinearGradient
-          colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.72)"]}
+          colors={["transparent", "rgba(0,0,0,0.28)", "rgba(0,0,0,0.85)"]}
+          locations={[0.3, 0.62, 1]}
           style={styles.overlay}
         />
 
-        <View style={styles.cornerBadge}>
-          <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+        {/* Shield badge – top right */}
+        <View style={styles.badge}>
+          <Ionicons name="shield-checkmark" size={13} color="#FFFFFF" />
         </View>
 
+        {/* Age pill – bottom right */}
         {!!age && (
-          <View style={styles.ageBadge}>
+          <View style={styles.agePill}>
             <ThemedText style={styles.ageText}>{age}</ThemedText>
           </View>
         )}
 
-        <View style={styles.info}>
+        {/* Info block – bottom left */}
+        <View style={[styles.info, !!age && styles.infoWithAge]}>
           <ThemedText style={styles.name} numberOfLines={1}>
             {pet?.name || "Unnamed"}
           </ThemedText>
@@ -103,8 +99,8 @@ export default function MeetCard({ pet, isLastInRow }) {
             <View style={styles.locationRow}>
               <Ionicons
                 name="location-outline"
-                size={13}
-                color="rgba(255,255,255,0.92)"
+                size={12}
+                color="rgba(255,255,255,0.88)"
               />
               <ThemedText style={styles.locationText} numberOfLines={1}>
                 {location}
@@ -120,23 +116,22 @@ export default function MeetCard({ pet, isLastInRow }) {
 const styles = StyleSheet.create({
   wrapper: {
     width: CARD_WIDTH,
-    height: CARD_HEIGHT,
     marginRight: CARD_GAP,
-    marginBottom: 18,
+    marginBottom: 12,
   },
   lastInRow: {
     marginRight: 0,
   },
   card: {
     flex: 1,
-    borderRadius: 30,
+    borderRadius: 24,
     overflow: "hidden",
-    backgroundColor: "#E2EAE4",
+    backgroundColor: "#D8E6DC",
     shadowColor: "#183125",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+    elevation: 4,
   },
   image: {
     width: "100%",
@@ -147,64 +142,69 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: "60%",
+    height: "65%",
   },
-  cornerBadge: {
+  badge: {
     position: "absolute",
-    top: 14,
-    right: 14,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    top: 12,
+    right: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: GREEN,
-    borderWidth: 3,
+    borderWidth: 2.5,
     borderColor: "#FFFFFF",
   },
-  ageBadge: {
+  agePill: {
     position: "absolute",
-    right: 12,
-    bottom: 12,
-    minWidth: 42,
-    height: 32,
-    borderRadius: 16,
+    right: 10,
+    bottom: 10,
+    minWidth: 34,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: "rgba(255,255,255,0.18)",
-    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+    paddingHorizontal: 8,
     alignItems: "center",
     justifyContent: "center",
   },
   ageText: {
     color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "800",
+    fontSize: 12,
+    fontWeight: "700",
   },
   info: {
     position: "absolute",
-    left: 14,
-    right: 14,
-    bottom: 14,
-    paddingRight: 42,
+    left: 12,
+    right: 12,
+    bottom: 12,
+  },
+  infoWithAge: {
+    right: 52,
   },
   name: {
     color: "#FFFFFF",
-    fontSize: 19,
+    fontSize: 16,
     fontWeight: "800",
+    letterSpacing: -0.2,
   },
   meta: {
-    marginTop: 4,
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 13,
+    marginTop: 2,
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 12,
   },
   locationRow: {
-    marginTop: 7,
+    marginTop: 5,
     flexDirection: "row",
     alignItems: "center",
+    gap: 3,
   },
   locationText: {
-    marginLeft: 4,
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 12,
+    color: "rgba(255,255,255,0.88)",
+    fontSize: 11,
     flex: 1,
   },
 });

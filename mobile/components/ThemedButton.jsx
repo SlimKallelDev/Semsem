@@ -15,9 +15,12 @@ function ThemedButton({ style, ...props }) {
 const styles = StyleSheet.create({
     btn: {
         backgroundColor: Colors.primary,
-        padding: 18,
-        borderRadius: 6,
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+        borderRadius: 14,
         marginVertical: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     pressed: {
         opacity: 0.5,

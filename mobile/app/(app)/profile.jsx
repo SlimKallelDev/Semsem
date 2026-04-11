@@ -6,7 +6,9 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   Share,
   StatusBar,
@@ -72,7 +74,7 @@ const pluralize = (count, singular, plural = `${singular}s`) => {
 };
 
 export default function ProfileScreen() {
-  const { user, setUser } = useUser();
+  const { user, setUser, logout } = useUser();
 
   const userId = useMemo(
     () => user?._id || user?.id || user?.$id || null,
@@ -300,7 +302,7 @@ export default function ProfileScreen() {
                       <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
                     ) : (
                       <View style={styles.avatarFallback}>
-                        <Ionicons name="person" size={72} color="#FFFFFF" />
+                        <Ionicons name="person" size={50} color="#FFFFFF" />
                       </View>
                     )}
                   </View>
@@ -315,7 +317,7 @@ export default function ProfileScreen() {
                   >
                     <Ionicons
                       name={avatarSaving ? "sync" : "camera"}
-                      size={20}
+                      size={16}
                       color="#FFFFFF"
                     />
                   </TouchableOpacity>
@@ -331,7 +333,7 @@ export default function ProfileScreen() {
 
               <View style={styles.statsCard}>
                 <View style={styles.statItem}>
-                  <Ionicons name="document-text-outline" size={28} color={GREEN} />
+                  <Ionicons name="document-text-outline" size={22} color={GREEN} />
                   <ThemedText style={styles.statValue}>{postCount}</ThemedText>
                   <ThemedText style={styles.statLabel}>Posts</ThemedText>
                 </View>
@@ -339,7 +341,7 @@ export default function ProfileScreen() {
                 <View style={styles.statDivider} />
 
                 <View style={styles.statItem}>
-                  <Ionicons name="paw-outline" size={28} color={GREEN} />
+                  <Ionicons name="paw-outline" size={22} color={GREEN} />
                   <ThemedText style={styles.statValue}>{petsCount}</ThemedText>
                   <ThemedText style={styles.statLabel}>Pets</ThemedText>
                 </View>
@@ -347,7 +349,7 @@ export default function ProfileScreen() {
                 <View style={styles.statDivider} />
 
                 <View style={styles.statItem}>
-                  <Ionicons name="heart-outline" size={28} color={GREEN} />
+                  <Ionicons name="heart-outline" size={22} color={GREEN} />
                   <ThemedText style={styles.statValue}>{likesCount}</ThemedText>
                   <ThemedText style={styles.statLabel}>Likes</ThemedText>
                 </View>
@@ -359,7 +361,7 @@ export default function ProfileScreen() {
                   onPress={openEditModal}
                   activeOpacity={0.9}
                 >
-                  <Ionicons name="create-outline" size={22} color="#FFFFFF" />
+                  <Ionicons name="create-outline" size={18} color="#FFFFFF" />
                   <ThemedText style={styles.primaryActionText}>
                     Edit Profile
                   </ThemedText>
@@ -370,7 +372,7 @@ export default function ProfileScreen() {
                   onPress={handleShareProfile}
                   activeOpacity={0.9}
                 >
-                  <Ionicons name="share-social-outline" size={24} color={GREEN} />
+                  <Ionicons name="share-social-outline" size={20} color={GREEN} />
                 </TouchableOpacity>
               </View>
 
@@ -379,7 +381,7 @@ export default function ProfileScreen() {
 
                 <View style={styles.infoRow}>
                   <View style={styles.infoIcon}>
-                    <Ionicons name="mail-outline" size={24} color={GREEN} />
+                    <Ionicons name="mail-outline" size={20} color={GREEN} />
                   </View>
                   <View style={styles.infoTextBlock}>
                     <ThemedText style={styles.infoLabel}>EMAIL</ThemedText>
@@ -391,7 +393,7 @@ export default function ProfileScreen() {
 
                 <View style={styles.infoRow}>
                   <View style={styles.infoIcon}>
-                    <Ionicons name="call-outline" size={24} color={GREEN} />
+                    <Ionicons name="call-outline" size={20} color={GREEN} />
                   </View>
                   <View style={styles.infoTextBlock}>
                     <ThemedText style={styles.infoLabel}>PHONE</ThemedText>
@@ -401,7 +403,7 @@ export default function ProfileScreen() {
 
                 <View style={styles.infoRow}>
                   <View style={styles.infoIcon}>
-                    <Ionicons name="location-outline" size={24} color={GREEN} />
+                    <Ionicons name="location-outline" size={20} color={GREEN} />
                   </View>
                   <View style={styles.infoTextBlock}>
                     <ThemedText style={styles.infoLabel}>LOCATION</ThemedText>
@@ -411,7 +413,7 @@ export default function ProfileScreen() {
 
                 <View style={styles.infoRow}>
                   <View style={styles.infoIcon}>
-                    <Ionicons name="calendar-outline" size={24} color={GREEN} />
+                    <Ionicons name="calendar-outline" size={20} color={GREEN} />
                   </View>
                   <View style={styles.infoTextBlock}>
                     <ThemedText style={styles.infoLabel}>MEMBER SINCE</ThemedText>
@@ -420,7 +422,20 @@ export default function ProfileScreen() {
                     </ThemedText>
                   </View>
                 </View>
-              </View>
+                </View>
+
+              {/* ── Logout ── */}
+              <TouchableOpacity
+                style={styles.logoutButton}
+                activeOpacity={0.85}
+                onPress={async () => {
+                  await logout();
+                  router.replace("/(auth)/login");
+                }}
+              >
+                <Ionicons name="log-out-outline" size={20} color="#D94F4F" />
+                <ThemedText style={styles.logoutText}>Log Out</ThemedText>
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
@@ -428,91 +443,112 @@ export default function ProfileScreen() {
         <Modal
           visible={editVisible}
           animationType="slide"
-          transparent
+          transparent={false}
           onRequestClose={closeEditModal}
         >
-          <View style={styles.modalOverlay}>
-            <SafeAreaView style={styles.modalSafeArea} edges={["bottom"]}>
-              <View style={styles.modalCard}>
-                <View style={styles.modalHandle} />
+          <SafeAreaView style={styles.editScreen} edges={["top", "bottom"]}>
+            {/* Header */}
+            <View style={styles.editHeader}>
+              <TouchableOpacity
+                onPress={closeEditModal}
+                activeOpacity={0.8}
+                style={styles.editHeaderClose}
+              >
+                <Ionicons name="chevron-back" size={22} color="#3C4A40" />
+              </TouchableOpacity>
 
-                <View style={styles.modalHeader}>
-                  <ThemedText style={styles.modalTitle}>Edit Profile</ThemedText>
-                  <TouchableOpacity onPress={closeEditModal} activeOpacity={0.8}>
-                    <Ionicons name="close" size={24} color="#67706B" />
-                  </TouchableOpacity>
-                </View>
-
-                <ScrollView
-                  contentContainerStyle={styles.modalContent}
-                  showsVerticalScrollIndicator={false}
-                >
-                  <TextInput
-                    value={form.name}
-                    onChangeText={(value) => updateForm("name", value)}
-                    placeholder="Name"
-                    style={styles.input}
-                  />
-
-                  <TextInput
-                    value={form.phone}
-                    onChangeText={(value) => updateForm("phone", value)}
-                    placeholder="Phone"
-                    keyboardType="phone-pad"
-                    style={styles.input}
-                  />
-
-                  <TextInput
-                    value={form.city}
-                    onChangeText={(value) => updateForm("city", value)}
-                    placeholder="City"
-                    style={styles.input}
-                  />
-
-                  <TextInput
-                    value={form.country}
-                    onChangeText={(value) => updateForm("country", value)}
-                    placeholder="Country"
-                    style={styles.input}
-                  />
-
-                  <TextInput
-                    value={form.bio}
-                    onChangeText={(value) => updateForm("bio", value)}
-                    placeholder="Bio"
-                    multiline
-                    maxLength={240}
-                    style={[styles.input, styles.textarea]}
-                  />
-
-                  <View style={styles.modalActions}>
-                    <TouchableOpacity
-                      style={styles.modalCancelButton}
-                      onPress={closeEditModal}
-                      disabled={saving}
-                    >
-                      <ThemedText style={styles.modalCancelText}>
-                        Cancel
-                      </ThemedText>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.modalSaveButton,
-                        saving && styles.modalSaveButtonDisabled,
-                      ]}
-                      onPress={handleSaveProfile}
-                      disabled={saving}
-                    >
-                      <ThemedText style={styles.modalSaveText}>
-                        {saving ? "Saving..." : "Save"}
-                      </ThemedText>
-                    </TouchableOpacity>
-                  </View>
-                </ScrollView>
+              <View style={styles.editHeaderCenter}>
+                <ThemedText style={styles.editHeaderTitle}>Edit Profile</ThemedText>
+                <ThemedText style={styles.editHeaderSubtitle}>Update your details</ThemedText>
               </View>
-            </SafeAreaView>
-          </View>
+
+              <TouchableOpacity
+                style={[styles.editHeaderSave, saving && { opacity: 0.6 }]}
+                onPress={handleSaveProfile}
+                disabled={saving}
+                activeOpacity={0.85}
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <ThemedText style={styles.editHeaderSaveText}>Save</ThemedText>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <KeyboardAvoidingView
+              style={{ flex: 1 }}
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              keyboardVerticalOffset={0}
+            >
+              <ScrollView
+                contentContainerStyle={styles.editFormContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {/* Name */}
+                <ThemedText style={styles.fieldLabel}>Name *</ThemedText>
+                <TextInput
+                  value={form.name}
+                  onChangeText={(v) => updateForm("name", v)}
+                  placeholder="Your full name"
+                  placeholderTextColor="#A8B5AE"
+                  style={styles.input}
+                  returnKeyType="next"
+                />
+
+                {/* Phone */}
+                <ThemedText style={styles.fieldLabel}>Phone</ThemedText>
+                <TextInput
+                  value={form.phone}
+                  onChangeText={(v) => updateForm("phone", v)}
+                  placeholder="e.g. +1 234 567 8900"
+                  placeholderTextColor="#A8B5AE"
+                  keyboardType="phone-pad"
+                  style={styles.input}
+                  returnKeyType="next"
+                />
+
+                {/* City */}
+                <ThemedText style={styles.fieldLabel}>City</ThemedText>
+                <TextInput
+                  value={form.city}
+                  onChangeText={(v) => updateForm("city", v)}
+                  placeholder="e.g. Cairo"
+                  placeholderTextColor="#A8B5AE"
+                  style={styles.input}
+                  returnKeyType="next"
+                />
+
+                {/* Country */}
+                <ThemedText style={styles.fieldLabel}>Country</ThemedText>
+                <TextInput
+                  value={form.country}
+                  onChangeText={(v) => updateForm("country", v)}
+                  placeholder="e.g. Egypt"
+                  placeholderTextColor="#A8B5AE"
+                  style={styles.input}
+                  returnKeyType="next"
+                />
+
+                {/* Bio */}
+                <ThemedText style={styles.fieldLabel}>Bio</ThemedText>
+                <TextInput
+                  value={form.bio}
+                  onChangeText={(v) => updateForm("bio", v)}
+                  placeholder="Tell others about yourself and your pets…"
+                  placeholderTextColor="#A8B5AE"
+                  multiline
+                  maxLength={240}
+                  style={[styles.input, styles.textarea]}
+                  textAlignVertical="top"
+                />
+                <ThemedText style={styles.charCount}>
+                  {form.bio.length}/240
+                </ThemedText>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          </SafeAreaView>
         </Modal>
       </SafeAreaView>
     </UserOnly>
@@ -572,82 +608,82 @@ const styles = StyleSheet.create({
   },
   avatarWrap: {
     position: "relative",
-    marginBottom: 16,
+    marginBottom: 14,
   },
   avatarOuter: {
-    width: 168,
-    height: 168,
-    borderRadius: 84,
+    width: 118,
+    height: 118,
+    borderRadius: 59,
     backgroundColor: "#F0FFF3",
     borderWidth: 3,
     borderColor: "#E7F6EB",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: GREEN,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.14,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowRadius: 14,
+    elevation: 6,
   },
   avatarImage: {
-    width: 158,
-    height: 158,
-    borderRadius: 79,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
   },
   avatarFallback: {
-    width: 158,
-    height: 158,
-    borderRadius: 79,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
     backgroundColor: GREEN,
     alignItems: "center",
     justifyContent: "center",
   },
   onlineDot: {
     position: "absolute",
-    top: 12,
-    right: 10,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    top: 6,
+    right: 6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: GREEN,
-    borderWidth: 4,
+    borderWidth: 3,
     borderColor: "#FFFFFF",
   },
   cameraButton: {
     position: "absolute",
-    right: -2,
-    bottom: 10,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    right: -4,
+    bottom: 4,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: GREEN,
-    borderWidth: 4,
+    borderWidth: 3,
     borderColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
   },
   name: {
-    fontSize: 34,
+    fontSize: 26,
     fontWeight: "800",
     color: "#101511",
   },
   handleText: {
-    fontSize: 18,
+    fontSize: 14,
     color: "#8A938D",
-    marginTop: 4,
+    marginTop: 3,
   },
   bioPill: {
-    marginTop: 22,
+    marginTop: 14,
     width: "100%",
     backgroundColor: SOFT_GREEN,
-    borderRadius: 22,
-    paddingHorizontal: 18,
-    paddingVertical: 18,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
   },
   bioText: {
     textAlign: "center",
-    fontSize: 18,
-    lineHeight: 28,
+    fontSize: 14,
+    lineHeight: 22,
     color: GREEN_DARK,
   },
   statsCard: {
@@ -655,12 +691,12 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     justifyContent: "space-between",
     backgroundColor: CARD_BG,
-    borderRadius: 28,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: BORDER,
-    paddingVertical: 18,
-    paddingHorizontal: 10,
-    marginTop: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    marginTop: 6,
   },
   statItem: {
     flex: 1,
@@ -670,48 +706,48 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1,
     backgroundColor: "#E5EAE6",
-    marginVertical: 10,
+    marginVertical: 8,
   },
   statValue: {
-    fontSize: 34,
+    fontSize: 26,
     fontWeight: "800",
     color: "#121814",
-    marginTop: 8,
+    marginTop: 6,
   },
   statLabel: {
-    fontSize: 16,
+    fontSize: 13,
     color: "#808985",
-    marginTop: 4,
+    marginTop: 3,
   },
   actionsRow: {
     flexDirection: "row",
-    gap: 14,
-    marginTop: 22,
+    gap: 12,
+    marginTop: 16,
   },
   primaryAction: {
     flex: 1,
-    height: 68,
-    borderRadius: 22,
+    height: 52,
+    borderRadius: 18,
     backgroundColor: GREEN,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
+    gap: 8,
     shadowColor: GREEN,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 6,
+    shadowRadius: 12,
+    elevation: 5,
   },
   primaryActionText: {
     color: "#FFFFFF",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "800",
   },
   secondaryAction: {
-    width: 68,
-    height: 68,
-    borderRadius: 22,
+    width: 52,
+    height: 52,
+    borderRadius: 18,
     backgroundColor: "#FFFFFF",
     borderWidth: 2,
     borderColor: GREEN,
@@ -720,133 +756,159 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     backgroundColor: CARD_BG,
-    borderRadius: 28,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: BORDER,
-    padding: 22,
-    marginTop: 24,
+    padding: 18,
+    marginTop: 18,
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 17,
     fontWeight: "800",
     color: "#131915",
-    marginBottom: 18,
+    marginBottom: 14,
   },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 18,
+    marginBottom: 14,
   },
   infoIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     backgroundColor: SOFT_GREEN,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 14,
+    marginRight: 12,
   },
   infoTextBlock: {
     flex: 1,
   },
   infoLabel: {
-    fontSize: 15,
-    letterSpacing: 1.8,
+    fontSize: 11,
+    letterSpacing: 1.4,
     color: "#A1AAA4",
-    marginBottom: 3,
+    marginBottom: 2,
   },
   infoValue: {
-    fontSize: 18,
-    lineHeight: 27,
+    fontSize: 15,
+    lineHeight: 22,
     color: "#151C17",
     fontWeight: "700",
   },
-  modalOverlay: {
+  editScreen: {
     flex: 1,
-    backgroundColor: "rgba(14, 18, 15, 0.34)",
-    justifyContent: "flex-end",
+    backgroundColor: "#F4F6F4",
   },
-  modalSafeArea: {
-    width: "100%",
-  },
-  modalCard: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    maxHeight: "84%",
-  },
-  modalHandle: {
-    alignSelf: "center",
-    width: 56,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#DFE4E0",
-    marginTop: 10,
-  },
-  modalHeader: {
+  editHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 18,
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E4EDE7",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 3,
+    gap: 10,
   },
-  modalTitle: {
-    fontSize: 24,
+  editHeaderClose: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#F3F5F3",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  editHeaderCenter: {
+    flex: 1,
+    alignItems: "center",
+  },
+  editHeaderTitle: {
+    fontSize: 17,
     fontWeight: "800",
     color: "#111713",
+    letterSpacing: -0.2,
   },
-  modalContent: {
-    padding: 18,
-    paddingBottom: 28,
+  editHeaderSubtitle: {
+    fontSize: 12,
+    color: "#8E9B93",
+    marginTop: 1,
+  },
+  editHeaderSave: {
+    minWidth: 72,
+    height: 36,
+    paddingHorizontal: 18,
+    borderRadius: 18,
+    backgroundColor: GREEN,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: GREEN,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  editHeaderSaveText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  editFormContent: {
+    padding: 20,
+    paddingBottom: 48,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#4F5E54",
+    marginBottom: 6,
+    marginLeft: 2,
+    letterSpacing: 0.3,
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#DDE7E0",
+    borderWidth: 1.5,
+    borderColor: "#D5E2D9",
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    marginBottom: 12,
+    marginBottom: 18,
     fontSize: 16,
     color: "#17201A",
   },
   textarea: {
-    minHeight: 120,
+    minHeight: 110,
     textAlignVertical: "top",
   },
-  modalActions: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 8,
+  charCount: {
+    fontSize: 12,
+    color: "#A4B0A8",
+    textAlign: "right",
+    marginTop: -14,
+    marginBottom: 18,
+    marginRight: 4,
   },
-  modalCancelButton: {
-    flex: 1,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: "#F4F6F4",
+  logoutButton: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 10,
+    marginTop: 24,
+    marginBottom: 8,
+    height: 52,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "#F2DADA",
+    backgroundColor: "#FFF7F7",
   },
-  modalCancelText: {
-    color: "#4B554E",
+  logoutText: {
     fontSize: 16,
     fontWeight: "700",
-  },
-  modalSaveButton: {
-    flex: 1,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: GREEN,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalSaveButtonDisabled: {
-    opacity: 0.7,
-  },
-  modalSaveText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "800",
+    color: "#D94F4F",
   },
 });

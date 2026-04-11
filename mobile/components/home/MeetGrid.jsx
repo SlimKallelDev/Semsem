@@ -44,7 +44,7 @@ function buildSubtitle(count, label) {
     return `${count} pets near you`;
   }
 
-  if (label === "In All the World") {
+  if (label === "All over the world") {
     return `${count} pets around the world`;
   }
 
@@ -122,7 +122,7 @@ export default function MeetGrid({ ownerId }) {
       }
       numColumns={2}
       renderItem={({ item, index }) => (
-        <MeetCard pet={item} isLastInRow={(index + 1) % 2 === 0} />
+        <MeetCard pet={item} index={index} isLastInRow={(index + 1) % 2 === 0} />
       )}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.list}
@@ -191,6 +191,7 @@ const styles = StyleSheet.create({
   row: {
     paddingHorizontal: 16,
     justifyContent: "space-between",
+    alignItems: "flex-start",
   },
   headerBlock: {
     backgroundColor: "#FFFFFF",
@@ -202,9 +203,13 @@ const styles = StyleSheet.create({
   },
   topRow: {
     paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   titleBlock: {
-    paddingRight: 8,
+    flex: 1,
+    paddingRight: 12,
   },
   title: {
     fontSize: 28,
@@ -212,25 +217,25 @@ const styles = StyleSheet.create({
     color: "#161F19",
   },
   subtitle: {
-    marginTop: 4,
-    fontSize: 15,
+    marginTop: 3,
+    fontSize: 14,
     color: "#79847D",
   },
   chipsRow: {
     paddingHorizontal: 16,
-    paddingTop: 18,
+    paddingTop: 16,
     paddingBottom: 2,
   },
   chip: {
-    height: 48,
-    paddingHorizontal: 22,
-    borderRadius: 24,
+    height: 40,
+    paddingHorizontal: 18,
+    borderRadius: 20,
     borderWidth: 1.5,
     borderColor: "#E5E9E6",
     backgroundColor: "#F9FAF9",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
+    marginRight: 10,
   },
   chipActive: {
     backgroundColor: "#FFFFFF",
@@ -243,7 +248,7 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: GREEN,
-    fontWeight: "800",
+    fontWeight: "700",
   },
   center: {
     flex: 1,
