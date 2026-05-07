@@ -1,10 +1,25 @@
 const Notification = require("../models/Notification");
 const { populateNotificationQuery } = require("../services/notificationService");
 
+const buildNotificationFilter = (req, extra = {}) => {
+  const filter = {
+    recipient: req.user.userId,
+    ...extra,
+  };
+
+  if (req.query.type) {
+    filter.type = req.query.type;
+  } else if (req.query.excludeType) {
+    filter.type = { $ne: req.query.excludeType };
+  }
+
+  return filter;
+};
+
 const getMyNotifications = async (req, res, next) => {
   try {
     const notifications = await populateNotificationQuery(
-      Notification.find({ recipient: req.user.userId }).sort({ createdAt: -1 })
+      Notification.find(buildNotificationFilter(req)).sort({ createdAt: -1 })
     );
 
     return res.status(200).json(notifications);
@@ -15,10 +30,9 @@ const getMyNotifications = async (req, res, next) => {
 
 const getUnreadNotificationCount = async (req, res, next) => {
   try {
-    const count = await Notification.countDocuments({
-      recipient: req.user.userId,
-      isRead: false,
-    });
+    const count = await Notification.countDocuments(
+      buildNotificationFilter(req, { isRead: false })
+    );
 
     return res.status(200).json({ count });
   } catch (error) {
@@ -55,10 +69,7 @@ const markNotificationAsRead = async (req, res, next) => {
 const markAllNotificationsAsRead = async (req, res, next) => {
   try {
     await Notification.updateMany(
-      {
-        recipient: req.user.userId,
-        isRead: false,
-      },
+      buildNotificationFilter(req, { isRead: false }),
       {
         isRead: true,
         readAt: new Date(),

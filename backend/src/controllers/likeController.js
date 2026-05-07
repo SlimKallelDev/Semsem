@@ -1,6 +1,7 @@
 const Like = require("../models/Like");
 const Post = require("../models/Post");
 const { createNotification } = require("../services/notificationService");
+const { USER_PUBLIC_FIELDS } = require("../constants/userPublicFields");
 
 const likePost = async (req, res, next) => {
   try {
@@ -40,8 +41,8 @@ const likePost = async (req, res, next) => {
     await post.save();
 
     const populatedLike = await Like.findById(like._id)
-      .populate("user")
-      .populate("post");
+      .populate("user", USER_PUBLIC_FIELDS)
+      .populate("post", "_id title user");
 
     await createNotification({
       recipient: post.user,
@@ -105,7 +106,7 @@ const getLikesByPost = async (req, res, next) => {
     const { postId } = req.params;
 
     const likes = await Like.find({ post: postId })
-      .populate("user")
+      .populate("user", USER_PUBLIC_FIELDS)
       .sort({ createdAt: -1 });
 
     res.status(200).json(likes);

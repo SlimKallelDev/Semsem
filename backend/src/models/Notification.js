@@ -15,7 +15,7 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["like", "comment", "message", "system"],
+      enum: ["like", "comment", "message", "appointment", "system"],
       required: true,
       index: true,
     },
@@ -31,7 +31,7 @@ const notificationSchema = new mongoose.Schema(
     },
     resourceType: {
       type: String,
-      enum: ["post", "conversation", "comment", "system"],
+      enum: ["post", "conversation", "comment", "appointment", "system"],
       default: "system",
       index: true,
     },
@@ -53,6 +53,11 @@ const notificationSchema = new mongoose.Schema(
       comment: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Comment",
+        default: null,
+      },
+      appointment: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Appointment",
         default: null,
       },
     },

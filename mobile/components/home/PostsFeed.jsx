@@ -1,7 +1,6 @@
 import {
   ActivityIndicator,
   FlatList,
-  ScrollView,
   StatusBar,
   StyleSheet,
   TouchableOpacity,
@@ -15,18 +14,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocationFilter } from "../../contexts/LocationFilterContext";
 import { getPosts } from "../../services/postService";
 import ThemedText from "../ThemedText";
-import HomeMeetPreview from "./HomeMeetPreview";
 import PostCard from "./PostCard";
 
 const GREEN = "#3DB85C";
-const GREEN_DARK = "#2A9448";
-const FILTERS = ["All", "Adoption", "Lost", "Found", "Mating", "General"];
 
-export default function PostsFeed() {
+export default function PostsFeed({ selectedFilter = "All" }) {
   const insets = useSafeAreaInsets();
   const fabBottom = Math.max(insets.bottom - 18, -10);
-  const { filters, selectionLabel } = useLocationFilter();
-  const [selectedFilter, setSelectedFilter] = useState("All");
+  const { filters } = useLocationFilter();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -52,7 +47,7 @@ export default function PostsFeed() {
   useFocusEffect(
     useCallback(() => {
       loadPosts();
-    }, [filters.city, filters.country])
+    }, [filters.governorate, filters.country])
   );
 
   const filteredPosts =
@@ -62,6 +57,7 @@ export default function PostsFeed() {
           (post) =>
             (post.type || "").toLowerCase() === selectedFilter.toLowerCase()
         );
+  const isInitialLoading = loading && filteredPosts.length === 0;
 
   return (
     <View style={styles.screen}>
@@ -77,76 +73,22 @@ export default function PostsFeed() {
         refreshing={refreshing}
         onRefresh={() => loadPosts(true)}
         contentContainerStyle={styles.listContent}
-        ListHeaderComponent={
-          <View>
-            <HomeMeetPreview />
-
-            <View style={styles.postsSectionIntro}>
-              <View style={styles.postsTitleRow}>
-                <View style={styles.postsTitleIcon}>
-                  <Ionicons name="document-text-outline" size={18} color={GREEN} />
-                </View>
-                <View>
-                  <ThemedText style={styles.postsTitle}>Latest Posts</ThemedText>
-                  <ThemedText style={styles.postsSubtitle}>
-                    {selectionLabel === "Near Me"
-                      ? "Fresh community updates around your area"
-                      : selectionLabel === "In All the World"
-                        ? "Fresh community updates from every region"
-                        : `Fresh community updates in ${selectionLabel}`}
-                  </ThemedText>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.categoriesSection}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoriesRow}
-              >
-                {FILTERS.map((filter) => {
-                  const isActive = selectedFilter === filter;
-
-                  return (
-                    <TouchableOpacity
-                      key={filter}
-                      style={[
-                        styles.categoryChip,
-                        isActive && styles.categoryChipActive,
-                      ]}
-                      onPress={() => setSelectedFilter(filter)}
-                      activeOpacity={0.85}
-                    >
-                      <ThemedText
-                        style={[
-                          styles.categoryChipText,
-                          isActive && styles.categoryChipTextActive,
-                        ]}
-                      >
-                        {filter}
-                      </ThemedText>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-
-            {loading ? (
+        ListFooterComponent={
+          isInitialLoading ? (
+            <View style={styles.loadingCard}>
               <View style={styles.center}>
                 <ActivityIndicator size="large" color={GREEN} />
               </View>
-            ) : null}
-          </View>
-        }
-        ListEmptyComponent={
-          !loading ? (
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="paw-off" size={42} color="#B9D8C1" />
-              <ThemedText style={styles.emptyTitle}>No posts yet</ThemedText>
-              <ThemedText style={styles.emptyText}>
-                Try another category or change the area filter above.
-              </ThemedText>
+            </View>
+          ) : !loading && filteredPosts.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons name="paw-off" size={42} color="#B9D8C1" />
+                <ThemedText style={styles.emptyTitle}>No posts yet</ThemedText>
+                <ThemedText style={styles.emptyText}>
+                  Try another category or change the area filter above.
+                </ThemedText>
+              </View>
             </View>
           ) : null
         }
@@ -166,74 +108,28 @@ export default function PostsFeed() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#F6FAF8",
+    backgroundColor: "#F2F5F2",
   },
   listContent: {
     paddingBottom: 112,
   },
-  postsSectionIntro: {
-    backgroundColor: "#F1F7F3",
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 10,
-  },
-  postsTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  postsTitleIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#EAF8ED",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  postsTitle: {
-    fontSize: 19,
-    fontWeight: "800",
-    color: "#17211B",
-  },
-  postsSubtitle: {
-    marginTop: 3,
-    fontSize: 13,
-    color: "#758179",
-  },
-  categoriesSection: {
+  loadingCard: {
+    marginHorizontal: 14,
+    marginTop: 10,
+    marginBottom: 8,
+    borderRadius: 18,
     backgroundColor: "#FFFFFF",
-    paddingTop: 10,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F2F2F2",
+    borderWidth: 1.35,
+    borderColor: "#D6E2DB",
+  },
+  emptyCard: {
+    marginHorizontal: 14,
+    marginTop: 10,
     marginBottom: 12,
-  },
-  categoriesRow: {
-    paddingHorizontal: 18,
-    gap: 10,
-  },
-  categoryChip: {
-    paddingHorizontal: 18,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#F7F7F7",
-    borderWidth: 1.5,
-    borderColor: "#E8E8E8",
-    justifyContent: "center",
-    marginRight: 10,
-  },
-  categoryChipActive: {
+    borderRadius: 18,
     backgroundColor: "#FFFFFF",
-    borderColor: GREEN,
-  },
-  categoryChipText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#666A67",
-  },
-  categoryChipTextActive: {
-    color: GREEN_DARK,
-    fontWeight: "700",
+    borderWidth: 1.35,
+    borderColor: "#D6E2DB",
   },
   center: {
     paddingVertical: 28,
@@ -244,7 +140,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 28,
-    paddingTop: 56,
+    paddingTop: 36,
+    paddingBottom: 36,
   },
   emptyTitle: {
     fontSize: 18,
@@ -274,3 +171,4 @@ const styles = StyleSheet.create({
     elevation: 7,
   },
 });
+

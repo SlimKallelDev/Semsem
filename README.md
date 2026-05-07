@@ -37,7 +37,8 @@ Semsem is a monorepo containing two applications:
 - **Framework:** Express 5
 - **Database:** MongoDB via Mongoose 9
 - **Auth:** JSON Web Tokens (`jsonwebtoken`) + password hashing (`bcryptjs`)
-- **Other:** `cors`, `dotenv`
+- **Image Storage:** Cloudinary profile avatar uploads
+- **Other:** `cors`, `dotenv`, `multer`
 
 ### Mobile
 - **Framework:** Expo ~54 with New Architecture enabled
@@ -111,6 +112,7 @@ Semsem/
 - **Notifications** — In-app notification sheet with unread counts and mark-as-read.
 - **Discovery ("Meet")** — Browse pets by location with a shared location filter across screens.
 - **Location Filtering** — Filter content by country and city through a global context.
+- **Profile Avatars** - Upload profile photos to Cloudinary and save the hosted URL in MongoDB.
 
 ---
 
@@ -172,6 +174,7 @@ Create `backend/.env` with the following keys:
 | `MONGO_URI` | MongoDB connection string |
 | `JWT_SECRET` | Secret used to sign JWT tokens |
 | `PORT` | Port the server listens on (default `5000`) |
+| `CLOUDINARY_URL` | Cloudinary credentials URL used for profile avatar uploads |
 
 ---
 

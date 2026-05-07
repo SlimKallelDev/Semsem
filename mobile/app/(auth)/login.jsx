@@ -1,5 +1,8 @@
 import { useState } from "react";
 import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   StyleSheet,
   TouchableWithoutFeedback,
   Keyboard,
@@ -7,6 +10,7 @@ import {
   Text,
 } from "react-native";
 import { Link, router } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import ThemedView from "../../components/ThemedView";
 import Spacer from "../../components/Spacer";
@@ -39,82 +43,99 @@ export default function Login() {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <ThemedView style={styles.container}>
-        <Spacer height={60} />
-        <ThemedText type="title" style={styles.title}>
-          Welcome Back!
-        </ThemedText>
-        <ThemedText type="subtitle" style={styles.subtitle}>
-          Login to connect with pet lovers
-        </ThemedText>
-
-        <Spacer height={40} />
-
-        <ThemedTextInput
-          placeholder="Email address"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          value={email}
-          onChangeText={setEmail}
-          style={styles.input}
-        />
-
-        <Spacer height={16} />
-
-        <ThemedTextInput
-          placeholder="Password"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-          style={styles.input}
-        />
-
-        <Spacer height={24} />
-
-        <ThemedButton
-          onPress={handleSubmit}
-          disabled={loading}
-          style={loading ? styles.buttonDisabled : null}
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={0}
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Sign In</Text>
-          )}
-        </ThemedButton>
+          <ScrollView
+            contentContainerStyle={styles.container}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+          >
+            <ThemedView>
+              <Spacer height={60} />
+              <ThemedText type="title" style={styles.title}>
+                Welcome Back!
+              </ThemedText>
+              <ThemedText type="subtitle" style={styles.subtitle}>
+                Login to connect with pet lovers
+              </ThemedText>
 
-        {error && (
-          <>
-            <Spacer height={16} />
-            <ThemedText style={styles.errorText}>{error}</ThemedText>
-          </>
-        )}
+              <Spacer height={40} />
 
-        <Spacer height={24} />
+              <ThemedTextInput
+                placeholder="Email address"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={email}
+                onChangeText={setEmail}
+                style={styles.input}
+              />
 
-        <Link href="/(auth)/forgot-password" asChild>
-          <ThemedText style={styles.link}>Forgot password?</ThemedText>
-        </Link>
+              <Spacer height={16} />
 
-        <Spacer height={48} />
+              <ThemedTextInput
+                placeholder="Password"
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+                style={styles.input}
+              />
 
-        <ThemedText style={styles.footer}>
-          Don't have an account?{" "}
-          <Link href="/(auth)/register" asChild>
-            <ThemedText style={styles.linkInline}>Sign up</ThemedText>
-          </Link>
-        </ThemedText>
+              <Spacer height={24} />
 
-        <Spacer height={40} />
-      </ThemedView>
-    </TouchableWithoutFeedback>
+              <ThemedButton
+                onPress={handleSubmit}
+                disabled={loading}
+                style={loading ? styles.buttonDisabled : null}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Sign In</Text>
+                )}
+              </ThemedButton>
+
+              {error && (
+                <>
+                  <Spacer height={16} />
+                  <ThemedText style={styles.errorText}>{error}</ThemedText>
+                </>
+              )}
+
+              <Spacer height={24} />
+
+              <Link href="/(auth)/forgot-password" asChild>
+                <ThemedText style={styles.link}>Forgot password?</ThemedText>
+              </Link>
+
+              <Spacer height={48} />
+
+              <ThemedText style={styles.footer}>
+                Don't have an account?{" "}
+                <Link href="/(auth)/register" asChild>
+                  <ThemedText style={styles.linkInline}>Sign up</ThemedText>
+                </Link>
+              </ThemedText>
+
+              <Spacer height={40} />
+            </ThemedView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 24 },
+  safeArea: { flex: 1, backgroundColor: "#F4F6F4" },
+  flex: { flex: 1 },
+  container: { flexGrow: 1, paddingHorizontal: 24 },
   title: { textAlign: "center", fontSize: 28 },
   subtitle: { textAlign: "center", marginTop: 8, opacity: 0.8 },
   input: { width: "100%" },

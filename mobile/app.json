@@ -5,7 +5,7 @@
     "slug": "Semsem",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/app-logo-phone.png",
+    "icon": "./assets/startup-splash.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -18,16 +18,24 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/app-logo-phone.png",
+        "foregroundImage": "./assets/startup-splash.png",
         "backgroundColor": "#59BE56"
       },
       "edgeToEdgeEnabled": true
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/startup-splash.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Semsem to detect your governorate and country for Near me filters."
+        }
+      ]
     ]
   }
 }
+

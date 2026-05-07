@@ -9,12 +9,13 @@ const {
   updatePet,
   deletePet,
 } = require("../controllers/petController");
+const { uploadPetImage } = require("../middlewares/uploadMiddleware");
 
 router.get("/", getPets);
 router.get("/user/:ownerId", getPetsByOwner);
 router.get("/:id", getPetById);
-router.post("/", createPet);
-router.put("/:id", updatePet);
+router.post("/", uploadPetImage, createPet);
+router.put("/:id", uploadPetImage, updatePet);
 router.delete("/:id", deletePet);
 
 module.exports = router;

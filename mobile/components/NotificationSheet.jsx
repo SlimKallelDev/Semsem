@@ -1,9 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
+  FlatList,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -15,6 +18,8 @@ import ThemedText from "./ThemedText";
 const GREEN = "#3DB85C";
 const GREEN_LIGHT = "#F1FBF3";
 const BORDER = "#E9EFEB";
+const OPEN_DURATION = 280;
+const CLOSE_DURATION = 220;
 
 const notificationStyles = {
   like: {
@@ -105,22 +110,126 @@ export default function NotificationSheet({
   onPressNotification,
   error,
 }) {
+  const [isMounted, setIsMounted] = useState(visible);
+  const progress = useRef(new Animated.Value(visible ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      setIsMounted(true);
+
+      const openAnimation = Animated.timing(progress, {
+        toValue: 1,
+        duration: OPEN_DURATION,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      });
+
+      openAnimation.start();
+      return () => openAnimation.stop();
+    }
+
+    const closeAnimation = Animated.timing(progress, {
+      toValue: 0,
+      duration: CLOSE_DURATION,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    });
+
+    closeAnimation.start(({ finished }) => {
+      if (finished) {
+        setIsMounted(false);
+      }
+    });
+
+    return () => closeAnimation.stop();
+  }, [progress, visible]);
+
+  const backdropOpacity = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
+  const sheetTranslateY = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [56, 0],
+  });
+
+  const sheetScale = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.98, 1],
+  });
+
+  const sheetOpacity = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.9, 1],
+  });
+
+  if (!isMounted) {
+    return null;
+  }
+
+  const renderNotification = ({ item: notification }) => {
+    const palette = getNotificationStyle(notification?.type);
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.notificationCard,
+          !notification?.isRead && styles.notificationCardUnread,
+        ]}
+        activeOpacity={0.88}
+        onPress={() => onPressNotification(notification)}
+      >
+        <View
+          style={[
+            styles.notificationIcon,
+            { backgroundColor: palette.iconBackground },
+          ]}
+        >
+          <Ionicons name={palette.icon} size={22} color={palette.iconColor} />
+        </View>
+
+        <View style={styles.notificationBody}>
+          <ThemedText style={styles.notificationText}>
+            {notification?.body || notification?.title}
+          </ThemedText>
+          <ThemedText style={styles.notificationTime}>
+            {formatRelativeTime(notification?.createdAt)}
+          </ThemedText>
+        </View>
+
+        {!notification?.isRead ? <View style={styles.unreadDot} /> : null}
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <Modal
-      visible={visible}
-      animationType="slide"
+      visible={isMounted}
+      animationType="none"
       transparent
       statusBarTranslucent
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
+        <Pressable style={styles.backdropPressable} onPress={onClose}>
+          <Animated.View
+            style={[styles.backdrop, { opacity: backdropOpacity }]}
+          />
+        </Pressable>
 
         <SafeAreaView style={styles.safeArea} edges={["bottom"]}>
-          <View style={styles.sheet}>
+          <Animated.View
+            style={[
+              styles.sheet,
+              {
+                opacity: sheetOpacity,
+                transform: [{ translateY: sheetTranslateY }, { scale: sheetScale }],
+              },
+            ]}
+          >
             <View style={styles.handle} />
 
-            {/* Header */}
             <View style={styles.headerRow}>
               <View style={styles.headerTextBlock}>
                 <ThemedText style={styles.title}>Notifications</ThemedText>
@@ -155,11 +264,10 @@ export default function NotificationSheet({
               </View>
             </View>
 
-            {/* Body */}
             {loading ? (
               <View style={styles.centeredState}>
                 <ActivityIndicator size="large" color={GREEN} />
-                <ThemedText style={styles.stateHint}>Loading…</ThemedText>
+                <ThemedText style={styles.stateHint}>Loading...</ThemedText>
               </View>
             ) : error ? (
               <View style={styles.centeredState}>
@@ -176,58 +284,25 @@ export default function NotificationSheet({
                 </View>
                 <ThemedText style={styles.stateTitle}>No notifications yet</ThemedText>
                 <ThemedText style={styles.stateHint}>
-                  Likes, comments, and messages{"\n"}will show up here.
+                  Likes and comments{"\n"}will show up here.
                 </ThemedText>
               </View>
             ) : (
-              <ScrollView
+              <FlatList
+                data={notifications}
+                renderItem={renderNotification}
+                keyExtractor={(item, index) =>
+                  String(item?._id || item?.id || `notification-${index}`)
+                }
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.listContent}
-              >
-                {notifications.map((notification) => {
-                  const palette = getNotificationStyle(notification?.type);
-
-                  return (
-                    <TouchableOpacity
-                      key={notification?._id}
-                      style={[
-                        styles.notificationCard,
-                        !notification?.isRead && styles.notificationCardUnread,
-                      ]}
-                      activeOpacity={0.88}
-                      onPress={() => onPressNotification(notification)}
-                    >
-                      <View
-                        style={[
-                          styles.notificationIcon,
-                          { backgroundColor: palette.iconBackground },
-                        ]}
-                      >
-                        <Ionicons
-                          name={palette.icon}
-                          size={22}
-                          color={palette.iconColor}
-                        />
-                      </View>
-
-                      <View style={styles.notificationBody}>
-                        <ThemedText style={styles.notificationText}>
-                          {notification?.body || notification?.title}
-                        </ThemedText>
-                        <ThemedText style={styles.notificationTime}>
-                          {formatRelativeTime(notification?.createdAt)}
-                        </ThemedText>
-                      </View>
-
-                      {!notification?.isRead ? (
-                        <View style={styles.unreadDot} />
-                      ) : null}
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+                initialNumToRender={8}
+                maxToRenderPerBatch={10}
+                windowSize={8}
+                removeClippedSubviews
+              />
             )}
-          </View>
+          </Animated.View>
         </SafeAreaView>
       </View>
     </Modal>
@@ -237,11 +312,14 @@ export default function NotificationSheet({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(15, 20, 18, 0.3)",
     justifyContent: "flex-end",
   },
+  backdropPressable: {
+    ...StyleSheet.absoluteFillObject,
+  },
   backdrop: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(15, 20, 18, 0.32)",
   },
   safeArea: {
     justifyContent: "flex-end",
@@ -250,11 +328,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
+    borderWidth: 1,
+    borderColor: "#E8EEEA",
     paddingHorizontal: 18,
     paddingTop: 10,
-    paddingBottom: 24,
-    maxHeight: "80%",
+    paddingBottom: 20,
+    maxHeight: "82%",
     minHeight: 320,
+    shadowColor: "#101713",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.09,
+    shadowRadius: 12,
+    elevation: 20,
   },
   handle: {
     alignSelf: "center",

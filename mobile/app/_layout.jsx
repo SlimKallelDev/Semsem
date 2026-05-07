@@ -1,6 +1,7 @@
 // mobile/app/_layout.jsx
 import { Stack } from "expo-router";
 import { Image, StyleSheet, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { UserProvider } from "../contexts/UserContext";
 import { useUser } from "../contexts/UserContext";
 
@@ -24,9 +25,11 @@ function AppBootstrap() {
 
 export default function RootLayout() {
   return (
-    <UserProvider>
-      <AppBootstrap />
-    </UserProvider>
+    <SafeAreaProvider>
+      <UserProvider>
+        <AppBootstrap />
+      </UserProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -34,9 +37,11 @@ const styles = StyleSheet.create({
   splashContainer: {
     flex: 1,
     backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
   },
   splashImage: {
-    width: "100%",
-    height: "100%",
+    width: 180,
+    height: 180,
   },
 });

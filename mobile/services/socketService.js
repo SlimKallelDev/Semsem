@@ -1,11 +1,11 @@
 import { io } from "socket.io-client";
-import API_BASE_URL from "./api";
+import { API_ORIGIN } from "./api";
 
 let socket = null;
 
 export const connectSocket = () => {
   if (!socket) {
-    socket = io(API_BASE_URL, {
+    socket = io(API_ORIGIN, {
       transports: ["websocket"], // important for React Native
     });
 

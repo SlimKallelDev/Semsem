@@ -18,10 +18,22 @@ const login = async (email, password) => {
   return data;
 };
 
-const register = async (name, email, password) => {
+const register = async (
+  name,
+  email,
+  password,
+  profileType,
+  profileDetails = {}
+) => {
   const data = await request("/auth/register", {
     method: "POST",
-    body: JSON.stringify({ name, email, password }),
+    body: JSON.stringify({
+      name,
+      email,
+      password,
+      profileType,
+      ...profileDetails,
+    }),
   });
 
   if (data?.token) {

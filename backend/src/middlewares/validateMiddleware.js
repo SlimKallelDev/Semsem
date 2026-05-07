@@ -1,10 +1,17 @@
+const { isPublicProfileType } = require("../constants/profileTypes");
+
 const validateRegister = (req, res, next) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, profileType } = req.body;
 
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !profileType) {
       res.status(400);
-      throw new Error("Name, email and password are required");
+      throw new Error("Name, email, password and profile type are required");
+    }
+
+    if (typeof profileType !== "string") {
+      res.status(400);
+      throw new Error("Profile type must be a single value");
     }
 
     if (typeof name !== "string" || name.trim().length < 2) {
@@ -24,6 +31,11 @@ const validateRegister = (req, res, next) => {
     if (typeof password !== "string" || password.length < 6) {
       res.status(400);
       throw new Error("Password must be at least 6 characters long");
+    }
+
+    if (!isPublicProfileType(profileType)) {
+      res.status(400);
+      throw new Error("Invalid profile type");
     }
 
     next();

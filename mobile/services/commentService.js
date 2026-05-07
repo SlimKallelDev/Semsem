@@ -1,9 +1,27 @@
 import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import API_BASE_URL from "./api";
 
 const API = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 30000,
 });
+
+API.interceptors.request.use(
+  async (config) => {
+    const token = await AsyncStorage.getItem("token");
+
+    if (token) {
+      config.headers = {
+        ...config.headers,
+        Authorization: `Bearer ${token}`,
+      };
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 export const createComment = async (commentData) => {
   try {
@@ -14,7 +32,11 @@ export const createComment = async (commentData) => {
       "createComment error:",
       error?.response?.data || error.message
     );
-    throw error;
+    throw new Error(
+      error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        "Failed to create comment"
+    );
   }
 };
 
@@ -27,7 +49,11 @@ export const getCommentsByPost = async (postId) => {
       "getCommentsByPost error:",
       error?.response?.data || error.message
     );
-    throw error;
+    throw new Error(
+      error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        "Failed to load comments"
+    );
   }
 };
 
@@ -40,7 +66,11 @@ export const updateComment = async (id, text) => {
       "updateComment error:",
       error?.response?.data || error.message
     );
-    throw error;
+    throw new Error(
+      error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        "Failed to update comment"
+    );
   }
 };
 
@@ -53,7 +83,11 @@ export const deleteComment = async (id) => {
       "deleteComment error:",
       error?.response?.data || error.message
     );
-    throw error;
+    throw new Error(
+      error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        "Failed to delete comment"
+    );
   }
 };
 

@@ -193,7 +193,7 @@ export default function MyPosts() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={["top"]}>
+      <SafeAreaView style={styles.safe} edges={[]}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={GREEN} />
         </View>
@@ -203,7 +203,7 @@ export default function MyPosts() {
 
   if (!userId) {
     return (
-      <SafeAreaView style={styles.safe} edges={["top"]}>
+      <SafeAreaView style={styles.safe} edges={[]}>
         <View style={styles.center}>
           <ThemedText>You need to be logged in to see your posts.</ThemedText>
         </View>
@@ -212,7 +212,7 @@ export default function MyPosts() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView style={styles.safe} edges={[]}>
       <FlatList
         data={posts}
         keyExtractor={(item) => item._id || item.id}
@@ -276,7 +276,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 20,
+    paddingTop: 10,
+    paddingBottom: 14,
   },
   pageTitle: {
     fontSize: 28,

@@ -3,6 +3,7 @@ import API_BASE_URL from "./api";
 
 const API = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 30000,
 });
 
 export const startConversation = async ({ user1, user2, petId }) => {
@@ -16,6 +17,11 @@ export const startConversation = async ({ user1, user2, petId }) => {
 
 export const getUserConversations = async (userId) => {
   const response = await API.get(`/conversations/user/${userId}`);
+  return response.data;
+};
+
+export const getConversationById = async (conversationId) => {
+  const response = await API.get(`/conversations/${conversationId}`);
   return response.data;
 };
 
@@ -37,6 +43,7 @@ export const deleteMessage = async (id) => {
 export default {
   startConversation,
   getUserConversations,
+  getConversationById,
   getMessagesByConversation,
   sendMessage,
   deleteMessage,

@@ -19,12 +19,12 @@ const startConversation = async (req, res, next) => {
     let conversation = await Conversation.findOne({
       participants: { $all: [user1, user2], $size: 2 },
     })
-      .populate("participants", "_id name email image")
+      .populate("participants", "_id name email avatar image")
       .populate({
         path: "lastMessage",
         populate: {
           path: "sender",
-          select: "_id name email image",
+          select: "_id name email avatar image",
         },
       });
 
@@ -34,12 +34,12 @@ const startConversation = async (req, res, next) => {
       });
 
       conversation = await Conversation.findById(conversation._id)
-        .populate("participants", "_id name email image")
+        .populate("participants", "_id name email avatar image")
         .populate({
           path: "lastMessage",
           populate: {
             path: "sender",
-            select: "_id name email image",
+            select: "_id name email avatar image",
           },
         });
     }
@@ -77,8 +77,16 @@ const sendMessage = async (req, res, next) => {
     });
 
     const populatedMessage = await Message.findById(message._id)
-      .populate("sender", "_id name email image")
+      .populate("sender", "_id name email avatar image")
       .populate("conversation");
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to(String(conversationExists._id)).emit("receive_message", {
+        ...populatedMessage.toObject(),
+        conversationId: String(conversationExists._id),
+      });
+    }
 
     const recipientIds = Array.isArray(conversationExists.participants)
       ? conversationExists.participants.filter(
@@ -118,7 +126,7 @@ const getMessagesByConversation = async (req, res, next) => {
     const { conversationId } = req.params;
 
     const messages = await Message.find({ conversation: conversationId })
-      .populate("sender", "_id name email image")
+      .populate("sender", "_id name email avatar image")
       .populate("conversation")
       .sort({ createdAt: 1 });
 

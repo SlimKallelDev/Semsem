@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -17,14 +17,31 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import UserOnly from "../../components/auth/UserOnly";
+import CountrySelector from "../../components/location/CountrySelector";
+import GovernorateSelector from "../../components/location/GovernorateSelector";
 import ThemedText from "../../components/ThemedText";
+import {
+  hasGovernorateListForCountry,
+  resolveCountryName,
+  resolveGovernorateForCountry,
+} from "../../constants/governorates";
+import {
+  DEFAULT_PROFILE_TYPE,
+  PROFILE_TYPES,
+  getProfileTypeLabel,
+} from "../../constants/profileTypes";
 import { useUser } from "../../contexts/UserContext";
 import { getPetsByOwner } from "../../services/petService";
 import { getPostsByUser } from "../../services/postService";
-import { getUser, updateUser } from "../../services/userService";
+import {
+  getUser,
+  updateUser,
+  updateUserAvatar,
+  updateUserWithAvatar,
+} from "../../services/userService";
 
 const GREEN = "#3DB85C";
 const GREEN_DARK = "#2A9448";
@@ -37,9 +54,17 @@ const BORDER = "#E4EFE7";
 const INITIAL_FORM = {
   name: "",
   phone: "",
-  city: "",
+  governorate: "",
   country: "",
   bio: "",
+  profileType: DEFAULT_PROFILE_TYPE,
+};
+
+const AVATAR_PICKER_OPTIONS = {
+  mediaTypes: ["images"],
+  allowsEditing: true,
+  aspect: [1, 1],
+  quality: 0.8,
 };
 
 const buildHandle = (name, email) => {
@@ -75,10 +100,16 @@ const pluralize = (count, singular, plural = `${singular}s`) => {
 
 export default function ProfileScreen() {
   const { user, setUser, logout } = useUser();
+  const insets = useSafeAreaInsets();
+  const { returnTo: rawReturnTo } = useLocalSearchParams();
 
   const userId = useMemo(
     () => user?._id || user?.id || user?.$id || null,
     [user]
+  );
+  const returnToPath = useMemo(
+    () => (Array.isArray(rawReturnTo) ? rawReturnTo[0] : rawReturnTo),
+    [rawReturnTo]
   );
 
   const [profile, setProfile] = useState(user || null);
@@ -89,6 +120,7 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [avatarSaving, setAvatarSaving] = useState(false);
   const [form, setForm] = useState(INITIAL_FORM);
+  const [selectedAvatar, setSelectedAvatar] = useState(null);
 
   useEffect(() => {
     if (user && !profile) {
@@ -138,6 +170,7 @@ export default function ProfileScreen() {
   }, [userId]);
 
   const avatarUri = profile?.avatar || profile?.image || "";
+  const editAvatarUri = selectedAvatar?.uri || avatarUri;
   const postCount = posts.length;
   const petsCount = pets.length;
   const likesCount = posts.reduce(
@@ -150,24 +183,32 @@ export default function ProfileScreen() {
     profile?.bio?.trim() ||
     `Animal lover | ${pluralize(petsCount, "pet")} parent`;
   const locationText =
-    [profile?.city, profile?.country].filter(Boolean).join(", ") ||
+    [profile?.governorate || profile?.city, profile?.country]
+      .filter(Boolean)
+      .join(", ") ||
     "Add your location";
   const phoneText = profile?.phone?.trim() || "Add your phone number";
+  const profileTypeText = getProfileTypeLabel(
+    profile?.profileType || DEFAULT_PROFILE_TYPE
+  );
   const memberSinceText = formatMemberSince(profile?.createdAt);
 
   const openEditModal = () => {
     setForm({
       name: profile?.name || "",
       phone: profile?.phone || "",
-      city: profile?.city || "",
+      governorate: profile?.governorate || profile?.city || "",
       country: profile?.country || "",
       bio: profile?.bio || "",
+      profileType: profile?.profileType || DEFAULT_PROFILE_TYPE,
     });
+    setSelectedAvatar(null);
     setEditVisible(true);
   };
 
   const closeEditModal = () => {
     if (saving) return;
+    setSelectedAvatar(null);
     setEditVisible(false);
   };
 
@@ -178,6 +219,90 @@ export default function ProfileScreen() {
     }));
   };
 
+  const updateProfileCountry = (nextCountry) => {
+    setForm((current) => ({
+      ...current,
+      country: nextCountry,
+      governorate: hasGovernorateListForCountry(nextCountry)
+        ? resolveGovernorateForCountry(nextCountry, current.governorate, {
+            fallbackToRaw: false,
+          })
+        : "",
+    }));
+  };
+
+  const pickAvatarFromGallery = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        "Permission needed",
+        "Gallery permission is required to choose a profile photo."
+      );
+      return null;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync(
+      AVATAR_PICKER_OPTIONS
+    );
+
+    if (result.canceled || !result.assets?.length) {
+      return null;
+    }
+
+    return result.assets[0];
+  };
+
+  const pickAvatarFromCamera = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        "Permission needed",
+        "Camera permission is required to take a profile photo."
+      );
+      return null;
+    }
+
+    const result = await ImagePicker.launchCameraAsync(AVATAR_PICKER_OPTIONS);
+
+    if (result.canceled || !result.assets?.length) {
+      return null;
+    }
+
+    return result.assets[0];
+  };
+
+  const pickAvatarAsset = async () => {
+    const source = await new Promise((resolve) => {
+      Alert.alert("Profile photo", "Choose how you want to add your photo.", [
+        {
+          text: "Take Photo",
+          onPress: () => resolve("camera"),
+        },
+        {
+          text: "Choose from Gallery",
+          onPress: () => resolve("gallery"),
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: () => resolve(null),
+        },
+      ]);
+    });
+
+    if (source === "camera") {
+      return pickAvatarFromCamera();
+    }
+
+    if (source === "gallery") {
+      return pickAvatarFromGallery();
+    }
+
+    return null;
+  };
+
   const handleSaveProfile = async () => {
     if (!userId) return;
 
@@ -186,18 +311,34 @@ export default function ProfileScreen() {
       return;
     }
 
+    if (!form.profileType) {
+      Alert.alert("Missing info", "Please select a profile type.");
+      return;
+    }
+
     try {
       setSaving(true);
 
-      const updated = await updateUser(userId, {
+      const normalizedCountry = resolveCountryName(form.country);
+      const normalizedGovernorate = resolveGovernorateForCountry(
+        normalizedCountry,
+        form.governorate
+      );
+      const profileUpdates = {
         name: form.name.trim(),
         phone: form.phone.trim(),
-        city: form.city.trim(),
-        country: form.country.trim(),
+        governorate: normalizedGovernorate.trim(),
+        country: normalizedCountry.trim(),
         bio: form.bio.trim(),
-      });
+        profileType: form.profileType,
+      };
+
+      const updated = selectedAvatar
+        ? await updateUserWithAvatar(userId, profileUpdates, selectedAvatar)
+        : await updateUser(userId, profileUpdates);
 
       syncProfile(updated);
+      setSelectedAvatar(null);
       setEditVisible(false);
     } catch (error) {
       console.log("Update profile error:", error.message);
@@ -211,33 +352,13 @@ export default function ProfileScreen() {
     if (!userId || avatarSaving) return;
 
     try {
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const avatarAsset = await pickAvatarAsset();
 
-      if (!permission.granted) {
-        Alert.alert(
-          "Permission needed",
-          "Gallery permission is required to choose a profile photo."
-        );
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (result.canceled || !result.assets?.length) {
-        return;
-      }
+      if (!avatarAsset) return;
 
       setAvatarSaving(true);
 
-      const updated = await updateUser(userId, {
-        avatar: result.assets[0].uri,
-      });
+      const updated = await updateUserAvatar(userId, avatarAsset);
 
       syncProfile(updated);
     } catch (error) {
@@ -252,6 +373,21 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleSelectProfileAvatar = async () => {
+    if (saving) return;
+
+    try {
+      const avatarAsset = await pickAvatarAsset();
+
+      if (avatarAsset) {
+        setSelectedAvatar(avatarAsset);
+      }
+    } catch (error) {
+      console.log("Pick avatar error:", error.message);
+      Alert.alert("Error", error.message || "Failed to choose profile photo.");
+    }
+  };
+
   const handleShareProfile = async () => {
     try {
       await Share.share({
@@ -261,6 +397,18 @@ export default function ProfileScreen() {
       console.log("Share profile error:", error.message);
     }
   };
+
+  const handleCloseProfile = useCallback(() => {
+    const nextPath =
+      typeof returnToPath === "string" ? returnToPath.trim() : "";
+
+    if (nextPath && nextPath !== "/profile") {
+      router.replace(nextPath);
+      return;
+    }
+
+    router.back();
+  }, [returnToPath]);
 
   if (loading) {
     return (
@@ -285,7 +433,7 @@ export default function ProfileScreen() {
 
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => router.back()}
+              onPress={handleCloseProfile}
               activeOpacity={0.85}
             >
               <Ionicons name="close" size={26} color="#6B716D" />
@@ -413,6 +561,16 @@ export default function ProfileScreen() {
 
                 <View style={styles.infoRow}>
                   <View style={styles.infoIcon}>
+                    <Ionicons name="briefcase-outline" size={20} color={GREEN} />
+                  </View>
+                  <View style={styles.infoTextBlock}>
+                    <ThemedText style={styles.infoLabel}>PROFILE TYPE</ThemedText>
+                    <ThemedText style={styles.infoValue}>{profileTypeText}</ThemedText>
+                  </View>
+                </View>
+
+                <View style={styles.infoRow}>
+                  <View style={styles.infoIcon}>
                     <Ionicons name="calendar-outline" size={20} color={GREEN} />
                   </View>
                   <View style={styles.infoTextBlock}>
@@ -446,9 +604,17 @@ export default function ProfileScreen() {
           transparent={false}
           onRequestClose={closeEditModal}
         >
-          <SafeAreaView style={styles.editScreen} edges={["top", "bottom"]}>
+          <SafeAreaView style={styles.editScreen} edges={["bottom"]}>
             {/* Header */}
-            <View style={styles.editHeader}>
+            <View
+              style={[
+                styles.editHeader,
+                {
+                  paddingTop:
+                    Math.max(insets.top, Platform.OS === "ios" ? 44 : 0) + 10,
+                },
+              ]}
+            >
               <TouchableOpacity
                 onPress={closeEditModal}
                 activeOpacity={0.8}
@@ -482,10 +648,41 @@ export default function ProfileScreen() {
               keyboardVerticalOffset={0}
             >
               <ScrollView
-                contentContainerStyle={styles.editFormContent}
+                contentContainerStyle={[
+                  styles.editFormContent,
+                  { paddingBottom: Math.max(48, insets.bottom + 24) },
+                ]}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
               >
+                <View style={styles.editAvatarBlock}>
+                  <View style={styles.editAvatarPreview}>
+                    {editAvatarUri ? (
+                      <Image
+                        source={{ uri: editAvatarUri }}
+                        style={styles.editAvatarImage}
+                      />
+                    ) : (
+                      <View style={styles.editAvatarFallback}>
+                        <Ionicons name="person" size={34} color="#FFFFFF" />
+                      </View>
+                    )}
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.editAvatarButton}
+                    onPress={handleSelectProfileAvatar}
+                    disabled={saving}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="camera-outline" size={18} color={GREEN} />
+                    <ThemedText style={styles.editAvatarButtonText}>
+                      Change photo
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+
                 {/* Name */}
                 <ThemedText style={styles.fieldLabel}>Name *</ThemedText>
                 <TextInput
@@ -496,6 +693,33 @@ export default function ProfileScreen() {
                   style={styles.input}
                   returnKeyType="next"
                 />
+
+                {/* Profile type */}
+                <ThemedText style={styles.fieldLabel}>Profile type *</ThemedText>
+                <View style={styles.profileTypeWrap}>
+                  {PROFILE_TYPES.map((type) => {
+                    const active = form.profileType === type.value;
+
+                    return (
+                      <TouchableOpacity
+                        key={type.value}
+                        activeOpacity={0.85}
+                        disabled={saving}
+                        onPress={() => updateForm("profileType", type.value)}
+                        style={[styles.profileTypeChip, active && styles.profileTypeChipActive]}
+                      >
+                        <ThemedText
+                          style={[
+                            styles.profileTypeChipText,
+                            active && styles.profileTypeChipTextActive,
+                          ]}
+                        >
+                          {type.label}
+                        </ThemedText>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
 
                 {/* Phone */}
                 <ThemedText style={styles.fieldLabel}>Phone</ThemedText>
@@ -509,26 +733,27 @@ export default function ProfileScreen() {
                   returnKeyType="next"
                 />
 
-                {/* City */}
-                <ThemedText style={styles.fieldLabel}>City</ThemedText>
-                <TextInput
-                  value={form.city}
-                  onChangeText={(v) => updateForm("city", v)}
-                  placeholder="e.g. Cairo"
-                  placeholderTextColor="#A8B5AE"
-                  style={styles.input}
-                  returnKeyType="next"
-                />
-
                 {/* Country */}
                 <ThemedText style={styles.fieldLabel}>Country</ThemedText>
-                <TextInput
+                <CountrySelector
                   value={form.country}
-                  onChangeText={(v) => updateForm("country", v)}
-                  placeholder="e.g. Egypt"
+                  onChange={updateProfileCountry}
+                  placeholder="Select a country"
                   placeholderTextColor="#A8B5AE"
-                  style={styles.input}
-                  returnKeyType="next"
+                  buttonStyle={styles.input}
+                  disabled={saving}
+                />
+
+                {/* Governorate */}
+                <ThemedText style={styles.fieldLabel}>Governorate</ThemedText>
+                <GovernorateSelector
+                  country={form.country}
+                  value={form.governorate}
+                  onChange={(v) => updateForm("governorate", v)}
+                  placeholder="e.g. Cairo"
+                  placeholderTextColor="#A8B5AE"
+                  inputStyle={styles.input}
+                  disabled={saving}
                 />
 
                 {/* Bio */}
@@ -862,6 +1087,51 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 48,
   },
+  editAvatarBlock: {
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  editAvatarPreview: {
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    backgroundColor: "#F0FFF3",
+    borderWidth: 3,
+    borderColor: "#E7F6EB",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  editAvatarImage: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+  },
+  editAvatarFallback: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: GREEN,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  editAvatarButton: {
+    height: 40,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: "#D5E2D9",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  editAvatarButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: GREEN,
+  },
   fieldLabel: {
     fontSize: 13,
     fontWeight: "600",
@@ -869,6 +1139,33 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginLeft: 2,
     letterSpacing: 0.3,
+  },
+  profileTypeWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 18,
+  },
+  profileTypeChip: {
+    borderWidth: 1.5,
+    borderColor: "#D5E2D9",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+  },
+  profileTypeChipActive: {
+    borderColor: GREEN,
+    backgroundColor: "#EAF7EE",
+  },
+  profileTypeChipText: {
+    fontSize: 13,
+    color: "#4F5E54",
+    fontWeight: "600",
+  },
+  profileTypeChipTextActive: {
+    color: GREEN_DARK,
+    fontWeight: "700",
   },
   input: {
     borderWidth: 1.5,
@@ -912,3 +1209,4 @@ const styles = StyleSheet.create({
     color: "#D94F4F",
   },
 });
+

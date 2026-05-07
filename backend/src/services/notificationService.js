@@ -17,6 +17,10 @@ const notificationPopulate = [
     path: "data.comment",
     select: "_id text post",
   },
+  {
+    path: "data.appointment",
+    select: "_id requester provider status requestedFor pets otherPet createdAt",
+  },
 ];
 
 const populateNotificationQuery = (query) => {
@@ -59,6 +63,7 @@ const createNotification = async ({
       post: data.post || null,
       conversation: data.conversation || null,
       comment: data.comment || null,
+      appointment: data.appointment || null,
     },
   });
 };

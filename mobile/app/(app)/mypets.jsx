@@ -176,7 +176,7 @@ export default function MyPetsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={["top"]}>
+      <SafeAreaView style={styles.safe} edges={[]}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={GREEN} />
         </View>
@@ -186,7 +186,7 @@ export default function MyPetsScreen() {
 
   if (!userId) {
     return (
-      <SafeAreaView style={styles.safe} edges={["top"]}>
+      <SafeAreaView style={styles.safe} edges={[]}>
         <View style={styles.center}>
           <ThemedText>You need to be logged in to see your pets.</ThemedText>
         </View>
@@ -195,7 +195,7 @@ export default function MyPetsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView style={styles.safe} edges={[]}>
       <FlatList
         data={pets}
         keyExtractor={(item, i) => item?._id || item?.id || String(i)}
@@ -215,9 +215,6 @@ export default function MyPetsScreen() {
           <View style={styles.pageHeader}>
             <View>
               <ThemedText style={styles.pageTitle}>My Pets</ThemedText>
-              <ThemedText style={styles.pageSubtitle}>
-                {pets.length} pet{pets.length !== 1 ? "s" : ""} registered
-              </ThemedText>
             </View>
             <TouchableOpacity
               style={styles.addBtn}
@@ -260,18 +257,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 20,
+    paddingTop: 10,
+    paddingBottom: 14,
   },
   pageTitle: {
     fontSize: 28,
     fontWeight: "800",
     color: "#131F17",
     letterSpacing: -0.4,
-  },
-  pageSubtitle: {
-    marginTop: 3,
-    fontSize: 14,
-    color: "#8E9B93",
   },
   addBtn: {
     width: 44,

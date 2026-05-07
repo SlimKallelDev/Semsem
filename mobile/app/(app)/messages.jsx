@@ -63,6 +63,7 @@ export default function MessagesScreen() {
     );
 
     const avatarUri =
+      otherUser?.avatar ||
       otherUser?.image ||
       "https://via.placeholder.com/100x100.png?text=User";
 
@@ -89,7 +90,7 @@ export default function MessagesScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <SafeAreaView style={styles.safeArea} edges={[]}>
         <ThemedView style={styles.center}>
           <ActivityIndicator size="large" />
         </ThemedView>
@@ -99,7 +100,7 @@ export default function MessagesScreen() {
 
   if (!userId) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <SafeAreaView style={styles.safeArea} edges={[]}>
         <ThemedView style={styles.center}>
           <ThemedText>You need to be logged in to see messages.</ThemedText>
         </ThemedView>
@@ -108,11 +109,9 @@ export default function MessagesScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+    <SafeAreaView style={styles.safeArea} edges={[]}>
       <ThemedView style={styles.container}>
-        <ThemedText type="title" style={styles.title}>
-          Messages 💬
-        </ThemedText>
+        <ThemedText style={styles.title}>Messages</ThemedText>
 
         <ThemedText style={styles.subtitle}>
           All your conversations with other users
@@ -134,11 +133,9 @@ export default function MessagesScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <ThemedText style={styles.emptyTitle}>
-                No conversations yet
-              </ThemedText>
+              <ThemedText style={styles.emptyTitle}>No conversations yet</ThemedText>
               <ThemedText style={styles.emptyText}>
-                Open a pet profile and tap “Message owner” to start chatting.
+                Open a pet profile and tap "Message" to start chatting.
               </ThemedText>
             </View>
           }
@@ -151,6 +148,7 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    backgroundColor: "#F4F6F4",
   },
   container: {
     flex: 1,
@@ -165,6 +163,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
+    fontWeight: "800",
+    color: "#17201A",
   },
   subtitle: {
     marginTop: 4,
@@ -172,11 +172,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   listContent: {
-    paddingBottom: 24,
+    paddingBottom: 4,
   },
   emptyListContent: {
     flexGrow: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
+    paddingTop: 72,
   },
   emptyState: {
     alignItems: "center",
@@ -196,10 +197,17 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f5f5f5",
-    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E8ECE9",
     padding: 12,
     marginBottom: 12,
+    shadowColor: "#1A3028",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   avatar: {
     width: 58,

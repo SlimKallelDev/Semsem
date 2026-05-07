@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { POST_TYPE_VALUES } = require("../constants/postTypes");
 
 const postSchema = new mongoose.Schema(
   {
@@ -12,7 +13,7 @@ const postSchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: ["adoption", "lost", "found", "mating", "general"],
+      enum: POST_TYPE_VALUES,
     },
 
     title: {
@@ -33,6 +34,15 @@ const postSchema = new mongoose.Schema(
       trim: true,
     },
 
+    images: {
+      type: [String],
+      default: [],
+      validate: {
+        validator: (value) => Array.isArray(value) && value.length <= 5,
+        message: "Post supports up to 5 images",
+      },
+    },
+
     pet_type: {
       type: String,
       default: "",
@@ -41,6 +51,12 @@ const postSchema = new mongoose.Schema(
     },
 
     location: {
+      governorate: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+      // Legacy field kept for backward compatibility with older records/clients.
       city: {
         type: String,
         trim: true,
@@ -65,11 +81,17 @@ const postSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    comments_count: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );
 
 postSchema.index({ createdAt: -1 });
-postSchema.index({ "location.country": 1, "location.city": 1 });
+postSchema.index({ "location.country": 1, "location.governorate": 1 });
 
 module.exports = mongoose.model("Post", postSchema);
+

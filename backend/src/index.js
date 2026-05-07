@@ -1,4 +1,4 @@
-require("dotenv").config();
+require("./config/env");
 
 const express = require("express");
 const cors = require("cors");
@@ -12,6 +12,7 @@ const likeRoutes = require("./routes/likeRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const conversationRoutes = require("./routes/conversationRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const appointmentRoutes = require("./routes/appointmentRoutes");
 
 const { notFound, errorHandler } = require("./middlewares/errorMiddleware");
 
@@ -34,6 +35,7 @@ app.use("/api/likes", likeRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/appointments", appointmentRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
