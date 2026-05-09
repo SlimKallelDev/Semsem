@@ -174,9 +174,10 @@ export default function SharedLocationFilterBar() {
     setIsOpen(false);
   };
 
+  const overlayPaddingTop = Math.max(insets.top + 54, 86);
+
   return (
     <>
-      {/* Compact location filter pill */}
       <TouchableOpacity
         style={styles.locationPill}
         onPress={() => setIsOpen((v) => !v)}
@@ -227,7 +228,7 @@ export default function SharedLocationFilterBar() {
             style={[
               styles.focusOverlayContent,
               {
-                paddingTop: Math.max(insets.top + 54, 86),
+                paddingTop: overlayPaddingTop,
               },
             ]}
           >
@@ -438,16 +439,16 @@ const styles = StyleSheet.create({
     maxWidth: 168,
     height: 44,
     borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#DDE9E1",
-    backgroundColor: "#F8FCF9",
-    paddingLeft: 7,
-    paddingRight: 8,
-    shadowColor: GREEN,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#D4E8DE",
+    backgroundColor: "#FAFCFB",
+    paddingLeft: 8,
+    paddingRight: 9,
+    shadowColor: "#0D1F14",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
   locationPillIcon: {
     width: 24,

@@ -279,6 +279,16 @@ export default function PetDetails() {
             <>
               <Spacer height={20} />
               <TouchableOpacity
+                onPress={() => petId && router.push(`/pet/${petId}/care-record`)}
+                style={styles.careRecordButton}
+                activeOpacity={0.9}
+              >
+                <ThemedText style={styles.careRecordButtonText}>
+                  Pet Care Record + QR
+                </ThemedText>
+              </TouchableOpacity>
+              <Spacer height={12} />
+              <TouchableOpacity
                 onPress={() => petId && router.push(`/pet/${petId}/edit`)}
                 style={styles.editButton}
                 activeOpacity={0.9}
@@ -466,6 +476,19 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",
+  },
+  careRecordButton: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1.5,
+    borderColor: "#2D8C49",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  careRecordButtonText: {
+    color: "#2D8C49",
+    fontWeight: "800",
+    fontSize: 16,
   },
   editButtonText: {
     color: GREEN,

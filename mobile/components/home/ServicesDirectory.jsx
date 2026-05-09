@@ -26,6 +26,8 @@ import ThemedText from "../ThemedText";
 
 const GREEN = "#3DB85C";
 const GREEN_DARK = "#227B3E";
+/** Same as MeetGrid masonry top inset + Meet card vertical rhythm */
+const CARD_SECTION_PADDING_TOP = 12;
 const SERVICE_TYPES = PROFILE_TYPES.filter((item) => item.value !== "pet_owner");
 const PLACEHOLDER_AVATAR = "https://via.placeholder.com/240x240.png?text=Semsem";
 
@@ -365,7 +367,8 @@ export default function ServicesDirectory({ selectedType = "all" }) {
 const styles = StyleSheet.create({
   listContent: {
     backgroundColor: "#F4F6F4",
-    paddingBottom: 34,
+    paddingTop: CARD_SECTION_PADDING_TOP,
+    paddingBottom: 112,
   },
   headerBlock: {
     backgroundColor: "#F4F6F4",
@@ -373,7 +376,8 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   errorCard: {
-    marginTop: 10,
+    marginTop: CARD_SECTION_PADDING_TOP,
+    marginBottom: 8,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "#F0C9C9",
@@ -392,7 +396,7 @@ const styles = StyleSheet.create({
   },
   providerCard: {
     marginHorizontal: 14,
-    marginTop: 10,
+    marginBottom: 12,
     borderRadius: 24,
     borderWidth: 1,
     borderColor: "#E2ECE6",
@@ -549,7 +553,8 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     marginHorizontal: 14,
-    marginTop: 10,
+    marginTop: CARD_SECTION_PADDING_TOP,
+    marginBottom: 12,
     borderRadius: 24,
     borderWidth: 1,
     borderColor: "#E2ECE6",

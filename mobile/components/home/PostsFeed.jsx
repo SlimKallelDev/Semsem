@@ -17,6 +17,8 @@ import ThemedText from "../ThemedText";
 import PostCard from "./PostCard";
 
 const GREEN = "#3DB85C";
+/** Align with MeetGrid masonry (`paddingTop: 12`) + MeetCard spacing (`marginBottom: 12`) */
+const CARD_SECTION_PADDING_TOP = 12;
 
 export default function PostsFeed({ selectedFilter = "All" }) {
   const insets = useSafeAreaInsets();
@@ -108,14 +110,15 @@ export default function PostsFeed({ selectedFilter = "All" }) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#F2F5F2",
+    backgroundColor: "#F4F6F4",
   },
   listContent: {
+    paddingTop: CARD_SECTION_PADDING_TOP,
     paddingBottom: 112,
   },
   loadingCard: {
     marginHorizontal: 14,
-    marginTop: 10,
+    marginTop: 0,
     marginBottom: 8,
     borderRadius: 18,
     backgroundColor: "#FFFFFF",
@@ -124,7 +127,7 @@ const styles = StyleSheet.create({
   },
   emptyCard: {
     marginHorizontal: 14,
-    marginTop: 10,
+    marginTop: 0,
     marginBottom: 12,
     borderRadius: 18,
     backgroundColor: "#FFFFFF",

@@ -181,6 +181,35 @@ export const deletePet = async (id) => {
   return response.data;
 };
 
+export const getPetCareRecord = async (id) => {
+  const response = await API.get(`/pets/${id}/care-record`);
+  return response.data;
+};
+
+export const updatePetCareRecord = async (id, careRecordPayload) => {
+  const response = await API.put(`/pets/${id}/care-record`, careRecordPayload);
+  return response.data;
+};
+
+const extractBackendOrigin = () => {
+  const normalized = String(API_BASE_URL || "").replace(/\/+$/, "");
+  return normalized.endsWith("/api")
+    ? normalized.slice(0, -4)
+    : normalized;
+};
+
+export const getPetCareRecordQr = async (id) => {
+  const response = await API.get(`/pets/${id}/care-record/qr`);
+  const data = response.data || {};
+
+  if (!data.scanUrl && data.encodedPayload) {
+    const origin = extractBackendOrigin();
+    data.scanUrl = `${origin}/api/pets/care-record/view?data=${data.encodedPayload}`;
+  }
+
+  return data;
+};
+
 export default {
   getPets,
   getPetById,
@@ -188,5 +217,8 @@ export default {
   createPet,
   updatePet,
   deletePet,
+  getPetCareRecord,
+  updatePetCareRecord,
+  getPetCareRecordQr,
 };
 

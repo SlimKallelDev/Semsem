@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
   },
   cardGrouped: {
     marginHorizontal: 12,
-    marginBottom: 10,
+    marginBottom: 12,
     borderRadius: 20,
   },
   imageWrapper: {

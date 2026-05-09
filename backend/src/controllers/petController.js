@@ -6,6 +6,7 @@ const OWNER_FIELDS =
 const HTTP_URL_PATTERN = /^https?:\/\//i;
 const PET_IMAGE_MIN_CREATE = 1;
 const PET_IMAGE_MAX = 5;
+const MAX_QR_PAYLOAD_LENGTH = 3500;
 
 const escapeRegex = (value = "") =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -230,6 +231,94 @@ const hydratePetImages = (pet) => {
   return normalizePetLocationDocument(pet);
 };
 
+const sanitizeString = (value) => String(value || "").trim();
+
+const normalizeStringArray = (value) => {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => sanitizeString(item)).filter(Boolean);
+};
+
+const normalizeCareRecord = (record = {}, pet = null) => {
+  const identity = record?.identityProfile || {};
+  const ownerInfo = identity?.ownerInfo || {};
+  const medical = record?.medicalHistory || {};
+  const illnesses = medical?.illnessesConditions || {};
+
+  const normalized = {
+    identityProfile: {
+      petName: sanitizeString(identity?.petName || pet?.name),
+      photo: sanitizeString(identity?.photo || pet?.image),
+      species: sanitizeString(identity?.species || pet?.type),
+      breed: sanitizeString(identity?.breed || pet?.breed),
+      gender: sanitizeString(identity?.gender || pet?.gender),
+      birthDateOrAge: sanitizeString(identity?.birthDateOrAge),
+      weight: sanitizeString(identity?.weight),
+      colorMarkings: sanitizeString(identity?.colorMarkings),
+      microchipId: sanitizeString(identity?.microchipId),
+      passportNumber: sanitizeString(identity?.passportNumber),
+      sterilized: Boolean(identity?.sterilized),
+      adoptionDate: sanitizeString(identity?.adoptionDate),
+      ownerInfo: {
+        name: sanitizeString(ownerInfo?.name || pet?.owner?.name),
+        phone: sanitizeString(ownerInfo?.phone),
+        email: sanitizeString(ownerInfo?.email || pet?.owner?.email),
+        address: sanitizeString(ownerInfo?.address),
+        emergencyContact: sanitizeString(ownerInfo?.emergencyContact),
+      },
+    },
+    medicalHistory: {
+      veterinaryVisits: Array.isArray(medical?.veterinaryVisits)
+        ? medical.veterinaryVisits.map((visit) => ({
+            visitDate: sanitizeString(visit?.visitDate),
+            veterinarianName: sanitizeString(visit?.veterinarianName),
+            clinic: sanitizeString(visit?.clinic),
+            reason: sanitizeString(visit?.reason),
+            diagnosis: sanitizeString(visit?.diagnosis),
+            notes: sanitizeString(visit?.notes),
+            attachments: normalizeStringArray(visit?.attachments),
+          }))
+        : [],
+      illnessesConditions: {
+        chronicDiseases: normalizeStringArray(illnesses?.chronicDiseases),
+        allergies: normalizeStringArray(illnesses?.allergies),
+        previousSurgeries: normalizeStringArray(illnesses?.previousSurgeries),
+        disabilities: normalizeStringArray(illnesses?.disabilities),
+        specialConditions: normalizeStringArray(illnesses?.specialConditions),
+      },
+      medications: Array.isArray(medical?.medications)
+        ? medical.medications.map((medication) => ({
+            name: sanitizeString(medication?.name),
+            dosage: sanitizeString(medication?.dosage),
+            frequency: sanitizeString(medication?.frequency),
+            startDate: sanitizeString(medication?.startDate),
+            endDate: sanitizeString(medication?.endDate),
+            prescriptionUpload: sanitizeString(medication?.prescriptionUpload),
+          }))
+        : [],
+    },
+    vaccinations: Array.isArray(record?.vaccinations)
+      ? record.vaccinations.map((vaccine) => ({
+          vaccineName: sanitizeString(vaccine?.vaccineName),
+          dateAdministered: sanitizeString(vaccine?.dateAdministered),
+          nextDoseDate: sanitizeString(vaccine?.nextDoseDate),
+          veterinarian: sanitizeString(vaccine?.veterinarian),
+          batchNumber: sanitizeString(vaccine?.batchNumber),
+          certificateUpload: sanitizeString(vaccine?.certificateUpload),
+        }))
+      : [],
+    updatedAt: new Date(),
+  };
+
+  return normalized;
+};
+
+const toBase64Url = (value) =>
+  Buffer.from(value, "utf-8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+
 const getPets = async (req, res, next) => {
   try {
     const locationFilter = buildPetLocationFilter(req.query);
@@ -386,6 +475,134 @@ const deletePet = async (req, res, next) => {
   }
 };
 
+const getPetCareRecord = async (req, res, next) => {
+  try {
+    const pet = await Pet.findById(req.params.id).populate("owner", OWNER_FIELDS);
+
+    if (!pet) {
+      return res.status(404).json({ message: "Pet not found" });
+    }
+
+    const careRecord = normalizeCareRecord(pet.careRecord || {}, pet);
+    res.status(200).json({
+      petId: pet._id,
+      petName: pet.name,
+      careRecord,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updatePetCareRecord = async (req, res, next) => {
+  try {
+    const pet = await Pet.findById(req.params.id).populate("owner", OWNER_FIELDS);
+
+    if (!pet) {
+      return res.status(404).json({ message: "Pet not found" });
+    }
+
+    const requesterId = String(req?.user?.userId || "");
+    const ownerId = String(pet?.owner?._id || pet?.owner || "");
+    if (!requesterId || requesterId !== ownerId) {
+      return res.status(403).json({ message: "Only the pet owner can update care records" });
+    }
+
+    const normalizedRecord = normalizeCareRecord(req.body || {}, pet);
+    pet.careRecord = normalizedRecord;
+    await pet.save();
+
+    res.status(200).json({
+      message: "Care record updated",
+      petId: pet._id,
+      careRecord: pet.careRecord,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getPetCareRecordQrData = async (req, res, next) => {
+  try {
+    const pet = await Pet.findById(req.params.id).populate("owner", OWNER_FIELDS);
+
+    if (!pet) {
+      return res.status(404).json({ message: "Pet not found" });
+    }
+
+    const careRecord = normalizeCareRecord(pet.careRecord || {}, pet);
+    const payload = {
+      petId: String(pet._id),
+      generatedAt: new Date().toISOString(),
+      careRecord,
+    };
+
+    const encodedPayload = toBase64Url(JSON.stringify(payload));
+    if (encodedPayload.length > MAX_QR_PAYLOAD_LENGTH) {
+      return res.status(400).json({
+        message:
+          "Care record is too large for full QR mode. Reduce text length for this MVP test.",
+      });
+    }
+
+    const origin = `${req.protocol}://${req.get("host")}`;
+    const scanUrl = `${origin}/api/pets/care-record/view?data=${encodedPayload}`;
+
+    res.status(200).json({
+      scanUrl,
+      encodedPayload,
+      payload,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const renderPetCareRecordQrView = async (req, res, next) => {
+  try {
+    const encoded = String(req.query?.data || "").trim();
+    if (!encoded) {
+      return res.status(400).send("<h2>Missing QR data</h2>");
+    }
+
+    const base64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = Buffer.from(base64, "base64").toString("utf-8");
+    const parsed = JSON.parse(decoded);
+
+    const pretty = JSON.stringify(parsed, null, 2)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    res.status(200).send(`
+      <!doctype html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Pet Care Record</title>
+        <style>
+          body { font-family: Arial, sans-serif; background:#f6f7f8; margin:0; padding:20px; }
+          .card { max-width:900px; margin:0 auto; background:#fff; border-radius:12px; padding:18px; box-shadow:0 4px 20px rgba(0,0,0,.08);}
+          h1 { margin:0 0 10px 0; font-size:24px; }
+          p { color:#445; margin-top:0; }
+          pre { white-space: pre-wrap; word-break: break-word; background:#f1f4f7; border-radius:8px; padding:14px; overflow:auto; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h1>Pet Care Record (MVP full QR data)</h1>
+          <p>This page is rendered directly from QR payload data.</p>
+          <pre>${pretty}</pre>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getPets,
   getPetById,
@@ -393,5 +610,9 @@ module.exports = {
   createPet,
   updatePet,
   deletePet,
+  getPetCareRecord,
+  updatePetCareRecord,
+  getPetCareRecordQrData,
+  renderPetCareRecordQrView,
 };
 

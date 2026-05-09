@@ -4,13 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import SharedLocationFilterBar from "../../components/location/SharedLocationFilterBar";
 import { LocationFilterProvider } from "../../contexts/LocationFilterContext";
 import { useUser } from "../../contexts/UserContext";
 import { subscribeNotificationsUpdated } from "../../services/notificationEvents";
 import {
   getUnreadNotificationCount,
 } from "../../services/notificationService";
+import {
+  CHROME_DIVIDER_COLOR,
+  CHROME_DIVIDER_HEIGHT,
+} from "../../constants/chromeLayout";
 
 const GREEN = "#3DB85C";
 const INACTIVE = "#8F9591";
@@ -172,10 +175,7 @@ export default function AppLayout() {
             headerLeftContainerStyle: styles.headerLeftContainer,
             headerRightContainerStyle: styles.headerRightContainer,
             headerRight: () => (
-              <View style={styles.headerActions}>
-                <SharedLocationFilterBar />
-                {renderProfileButton()}
-              </View>
+              <View style={styles.headerActions}>{renderProfileButton()}</View>
             ),
           }}
         >
@@ -299,8 +299,8 @@ const styles = StyleSheet.create({
   headerBackground: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#EFEFEF",
+    borderBottomWidth: CHROME_DIVIDER_HEIGHT,
+    borderBottomColor: CHROME_DIVIDER_COLOR,
   },
   headerLeftContainer: {
     paddingLeft: 18,
@@ -312,16 +312,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   headerTitleText: {
     fontSize: 30,
     fontWeight: "800",
     color: GREEN,
     letterSpacing: 0.3,
-  },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
   },
   btnWrap: {
     position: "relative",

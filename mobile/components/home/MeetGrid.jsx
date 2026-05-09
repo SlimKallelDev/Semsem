@@ -15,6 +15,8 @@ import ThemedText from "../ThemedText";
 import MeetCard from "./MeetCard";
 
 const GREEN = "#3DB85C";
+/** Shared with PostsFeed / ServicesDirectory content top inset */
+const CARD_SECTION_PADDING_TOP = 12;
 
 function matchesType(pet, selectedType) {
   if (selectedType === "all") {
@@ -188,7 +190,7 @@ const styles = StyleSheet.create({
   masonry: {
     flexDirection: "row",
     paddingHorizontal: 14,
-    paddingTop: 12,
+    paddingTop: CARD_SECTION_PADDING_TOP,
     alignItems: "flex-start",
     gap: 12,
   },
@@ -232,7 +234,7 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     marginHorizontal: 14,
-    marginTop: 10,
+    marginTop: CARD_SECTION_PADDING_TOP,
     borderRadius: 20,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,

@@ -5,11 +5,28 @@ import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import MeetGrid from "../../components/home/MeetGrid";
 import PostsFeed from "../../components/home/PostsFeed";
 import ServicesDirectory from "../../components/home/ServicesDirectory";
+import SharedLocationFilterBar from "../../components/location/SharedLocationFilterBar";
 import ThemedText from "../../components/ThemedText";
+import {
+  CHROME_DIVIDER_COLOR,
+  CHROME_DIVIDER_HEIGHT,
+} from "../../constants/chromeLayout";
 import { PROFILE_TYPES } from "../../constants/profileTypes";
 
-const GREEN = "#3DB85C";
-const GREEN_DARK = "#227B3E";
+/** Vertical rhythm: logo row → segmented tabs → section title + location */
+const CHROME_TOOLBAR_GAP = 12;
+
+/** Home shell — restrained palette, same accent; emphasis via space & typography */
+const ACCENT = "#3DB85C";
+const ACCENT_MUTED = "#2F6B45";
+const PAGE_BG = "#F2F5F2";
+const SURFACE = "#FFFFFF";
+const TRACK = "#EBF5EF";
+const TRACK_BORDER = "#D8E8E0";
+const TEXT_MAIN = "#1A231E";
+const TEXT_MUTED = "#5C6C64";
+const RADIUS_LG = 20;
+const RADIUS_MD = 16;
 const TABS = [
   {
     value: "feed",
@@ -106,7 +123,7 @@ export default function Home() {
   );
 
   const renderIcon = (item, active = false, size = 15) => {
-    const color = active ? "#FFFFFF" : "#66736B";
+    const color = active ? SURFACE : TEXT_MUTED;
 
     if (item.iconFamily === "mci") {
       return <MaterialCommunityIcons name={item.icon} size={size} color={color} />;
@@ -143,7 +160,7 @@ export default function Home() {
               <TouchableOpacity
                 key={tab.value}
                 style={[styles.navButton, active && styles.navButtonActive]}
-                activeOpacity={0.88}
+                activeOpacity={0.82}
                 onPress={() => handleChangeTab(tab.value)}
               >
                 {renderIcon(tab, active)}
@@ -158,36 +175,44 @@ export default function Home() {
           })}
         </View>
 
-        <View style={styles.sectionToolbar}>
-          <View style={styles.sectionTitleRow}>
+        <View style={styles.toolbarDivider} />
+
+        <View style={styles.sectionToolbarRow}>
+          <View style={styles.sectionHeadLeft}>
             <View style={styles.sectionIconWrap}>
               {renderIcon(activeMeta, false, 16)}
             </View>
             <ThemedText style={styles.sectionTitle} numberOfLines={1}>
               {activeMeta.title}
             </ThemedText>
+            <TouchableOpacity
+              style={styles.categoryTriangleBtn}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={() => setFilterMenuOpen((value) => !value)}
+              accessibilityRole="button"
+              accessibilityLabel={`${activeMeta.title}: ${activeFilter.label}`}
+              accessibilityHint="Opens category filter options"
+            >
+              <View style={styles.categoryTriangleInner}>
+                <MaterialCommunityIcons
+                  name={filterMenuOpen ? "menu-up" : "menu-down"}
+                  size={18}
+                  color={ACCENT_MUTED}
+                />
+              </View>
+            </TouchableOpacity>
           </View>
-
-          <TouchableOpacity
-            style={styles.filterButton}
-            activeOpacity={0.88}
-            onPress={() => setFilterMenuOpen((value) => !value)}
-          >
-            <ThemedText style={styles.filterButtonText} numberOfLines={1}>
-              {activeFilter.label}
-            </ThemedText>
-            <Ionicons
-              name={filterMenuOpen ? "chevron-up" : "chevron-down"}
-              size={14}
-              color={GREEN_DARK}
-            />
-          </TouchableOpacity>
+          <View style={styles.locationSlot}>
+            <SharedLocationFilterBar />
+          </View>
         </View>
 
         {filterMenuOpen ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.filterMenu}
           >
             {activeMeta.filters.map((filter) => {
@@ -230,144 +255,168 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F4F6F4",
+    backgroundColor: PAGE_BG,
   },
   topNavWrap: {
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E3ECE6",
-    paddingHorizontal: 14,
-    paddingTop: 8,
-    paddingBottom: 8,
-    shadowColor: "#152A1D",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.07,
-    shadowRadius: 9,
-    elevation: 4,
+    backgroundColor: SURFACE,
+    borderBottomWidth: CHROME_DIVIDER_HEIGHT,
+    borderBottomColor: CHROME_DIVIDER_COLOR,
+    paddingHorizontal: 16,
+    paddingTop: CHROME_TOOLBAR_GAP,
+    paddingBottom: CHROME_TOOLBAR_GAP,
+    shadowColor: "#0D1F14",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
     zIndex: 10,
   },
   segmentedNav: {
-    minHeight: 44,
-    borderRadius: 18,
-    backgroundColor: "#F2F6F3",
-    borderWidth: 1,
-    borderColor: "#E0E8E3",
-    padding: 4,
+    minHeight: 48,
+    borderRadius: RADIUS_LG,
+    backgroundColor: TRACK,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: TRACK_BORDER,
+    padding: 5,
     flexDirection: "row",
-    gap: 4,
+    gap: 5,
   },
   navButton: {
     flex: 1,
     minWidth: 0,
-    height: 36,
-    borderRadius: 14,
+    height: 38,
+    borderRadius: RADIUS_MD - 4,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
-    gap: 5,
-    paddingHorizontal: 6,
+    gap: 6,
+    paddingHorizontal: 4,
   },
   navButtonActive: {
-    backgroundColor: GREEN,
-    shadowColor: GREEN,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.24,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: ACCENT,
+    shadowColor: ACCENT,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.14,
+    shadowRadius: 6,
+    elevation: 2,
   },
   navButtonText: {
     flexShrink: 1,
-    color: "#66736B",
-    fontSize: 11,
-    fontWeight: "900",
+    color: TEXT_MUTED,
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: -0.15,
   },
   navButtonTextActive: {
-    color: "#FFFFFF",
+    color: SURFACE,
+    fontWeight: "800",
   },
-  sectionToolbar: {
-    marginTop: 8,
-    minHeight: 38,
-    borderRadius: 18,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E2EAE5",
-    paddingLeft: 8,
-    paddingRight: 7,
+  toolbarDivider: {
+    height: CHROME_DIVIDER_HEIGHT,
+    backgroundColor: CHROME_DIVIDER_COLOR,
+    marginTop: CHROME_TOOLBAR_GAP,
+    marginHorizontal: -2,
+  },
+  sectionToolbarRow: {
+    marginTop: CHROME_TOOLBAR_GAP,
+    paddingTop: 2,
+    minHeight: 46,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 10,
+    gap: 12,
   },
-  sectionTitleRow: {
+  sectionHeadLeft: {
     flex: 1,
     minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
   },
-  sectionIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#EEF7F1",
+  categoryTriangleBtn: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingLeft: 4,
+    marginLeft: 2,
+  },
+  categoryTriangleInner: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: TRACK,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: TRACK_BORDER,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 8,
+  },
+  locationSlot: {
+    flexShrink: 0,
+    justifyContent: "center",
+    alignItems: "flex-end",
+    maxWidth: "46%",
+  },
+  sectionIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#F4FAF6",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(61, 184, 92, 0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
   },
   sectionTitle: {
     flex: 1,
-    color: "#17211A",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  filterButton: {
-    maxWidth: 168,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "#EAF8EE",
-    borderWidth: 1,
-    borderColor: "#D4ECDD",
-    paddingHorizontal: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-  },
-  filterButtonText: {
-    flexShrink: 1,
-    color: GREEN_DARK,
-    fontSize: 12,
-    fontWeight: "900",
+    color: TEXT_MAIN,
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: -0.35,
+    marginRight: 6,
+    lineHeight: 21,
   },
   filterMenu: {
-    gap: 8,
-    paddingTop: 8,
-    paddingBottom: 2,
-    paddingRight: 8,
+    gap: 10,
+    paddingTop: CHROME_TOOLBAR_GAP,
+    paddingBottom: 6,
+    paddingLeft: 2,
+    paddingRight: 16,
+    alignItems: "center",
   },
   filterOption: {
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 1.2,
-    borderColor: "#DDE6E0",
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 11,
+    minHeight: 38,
+    borderRadius: 19,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#DCE7E1",
+    backgroundColor: "#FAFCFB",
+    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 7,
+    shadowColor: "#0D1F14",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.035,
+    shadowRadius: 2,
+    elevation: 1,
   },
   filterOptionActive: {
-    backgroundColor: GREEN,
-    borderColor: GREEN,
+    backgroundColor: ACCENT,
+    borderColor: ACCENT,
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
   },
   filterOptionText: {
-    color: "#617069",
-    fontSize: 12,
-    fontWeight: "900",
+    color: TEXT_MUTED,
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: -0.2,
   },
   filterOptionTextActive: {
-    color: "#FFFFFF",
+    color: SURFACE,
+    fontWeight: "800",
   },
   content: {
     flex: 1,
+    backgroundColor: PAGE_BG,
   },
 });
