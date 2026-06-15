@@ -5,15 +5,17 @@ export const POST_TYPES = Object.freeze({
   LOST: "lost",
   FOUND: "found",
   MATING: "mating",
+  SALE: "sale",
   GENERAL: "general",
 });
 
 export const POST_TYPE_OPTIONS = [
+  { value: POST_TYPES.GENERAL, label: "Question" },
   { value: POST_TYPES.ADOPTION, label: "Adoption" },
   { value: POST_TYPES.LOST, label: "Lost" },
   { value: POST_TYPES.FOUND, label: "Found" },
   { value: POST_TYPES.MATING, label: "Mating" },
-  { value: POST_TYPES.GENERAL, label: "General" },
+  { value: POST_TYPES.SALE, label: "Sale" },
 ];
 
 const PROFILE_POST_TYPE_MAP = {
@@ -22,6 +24,7 @@ const PROFILE_POST_TYPE_MAP = {
     POST_TYPES.LOST,
     POST_TYPES.FOUND,
     POST_TYPES.MATING,
+    POST_TYPES.SALE,
     POST_TYPES.GENERAL,
   ],
   veterinarian: [POST_TYPES.LOST, POST_TYPES.FOUND, POST_TYPES.GENERAL],
@@ -32,18 +35,33 @@ const PROFILE_POST_TYPE_MAP = {
     POST_TYPES.FOUND,
     POST_TYPES.GENERAL,
   ],
-  breeders: [POST_TYPES.ADOPTION, POST_TYPES.MATING, POST_TYPES.GENERAL],
+  breeders: [
+    POST_TYPES.ADOPTION,
+    POST_TYPES.MATING,
+    POST_TYPES.SALE,
+    POST_TYPES.GENERAL,
+  ],
   pet_sitters: [POST_TYPES.GENERAL],
   groomer: [POST_TYPES.GENERAL],
-  pet_shops: [POST_TYPES.GENERAL],
+  pet_shops: [POST_TYPES.SALE, POST_TYPES.GENERAL],
   boarding: [POST_TYPES.GENERAL],
   admin: Object.values(POST_TYPES),
 };
 
 export const normalizePostType = (value) => {
-  return String(value || "")
+  const normalized = String(value || "")
     .trim()
     .toLowerCase();
+
+  if (["question", "questions", "ask"].includes(normalized)) {
+    return POST_TYPES.GENERAL;
+  }
+
+  if (["vente", "sell", "selling", "for_sale", "for-sale"].includes(normalized)) {
+    return POST_TYPES.SALE;
+  }
+
+  return normalized;
 };
 
 export const getAllowedPostTypesForProfileType = (profileType) => {
@@ -71,5 +89,5 @@ export const isPostTypeAllowedForProfileType = (profileType, postType) => {
 export const getPostTypeLabel = (postType) => {
   const normalizedPostType = normalizePostType(postType);
   const found = POST_TYPE_OPTIONS.find((item) => item.value === normalizedPostType);
-  return found?.label || "General";
+  return found?.label || "Question";
 };

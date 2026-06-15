@@ -29,11 +29,11 @@ function formatLocation(pet) {
   }
 
   return [
+    pet?.location?.country || pet?.owner?.country,
     pet?.location?.governorate ||
       pet?.location?.city ||
       pet?.owner?.governorate ||
       pet?.owner?.city,
-    pet?.location?.country || pet?.owner?.country,
   ]
     .filter(Boolean)
     .join(", ");

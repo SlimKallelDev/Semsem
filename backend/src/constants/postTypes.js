@@ -9,6 +9,7 @@ const POST_TYPES = Object.freeze({
   LOST: "lost",
   FOUND: "found",
   MATING: "mating",
+  SALE: "sale",
   GENERAL: "general",
 });
 
@@ -21,6 +22,7 @@ const PROFILE_POST_TYPE_MAP = Object.freeze({
     POST_TYPES.LOST,
     POST_TYPES.FOUND,
     POST_TYPES.MATING,
+    POST_TYPES.SALE,
     POST_TYPES.GENERAL,
   ],
   [USER_PROFILE_TYPES.VETERINARIAN]: [
@@ -43,19 +45,30 @@ const PROFILE_POST_TYPE_MAP = Object.freeze({
   [USER_PROFILE_TYPES.BREEDERS]: [
     POST_TYPES.ADOPTION,
     POST_TYPES.MATING,
+    POST_TYPES.SALE,
     POST_TYPES.GENERAL,
   ],
   [USER_PROFILE_TYPES.PET_SITTERS]: [POST_TYPES.GENERAL],
   [USER_PROFILE_TYPES.GROOMER]: [POST_TYPES.GENERAL],
-  [USER_PROFILE_TYPES.PET_SHOPS]: [POST_TYPES.GENERAL],
+  [USER_PROFILE_TYPES.PET_SHOPS]: [POST_TYPES.SALE, POST_TYPES.GENERAL],
   [USER_PROFILE_TYPES.BOARDING]: [POST_TYPES.GENERAL],
   [USER_PROFILE_TYPES.ADMIN]: POST_TYPE_VALUES,
 });
 
 const normalizePostType = (value) => {
-  return String(value || "")
+  const normalized = String(value || "")
     .trim()
     .toLowerCase();
+
+  if (["question", "questions", "ask"].includes(normalized)) {
+    return POST_TYPES.GENERAL;
+  }
+
+  if (["vente", "sell", "selling", "for_sale", "for-sale"].includes(normalized)) {
+    return POST_TYPES.SALE;
+  }
+
+  return normalized;
 };
 
 const isValidPostType = (value) => {

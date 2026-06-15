@@ -1,7 +1,7 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Image,
@@ -17,7 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AppTopBar from "../../components/AppTopBar";
-import GovernorateSelector from "../../components/location/GovernorateSelector";
+import LocationSelector from "../../components/location/LocationSelector";
 import ThemedText from "../../components/ThemedText";
 import ThemedView from "../../components/ThemedView";
 import {
@@ -29,6 +29,7 @@ import { createPet } from "../../services/petService";
 
 const GREEN = "#3DB85C";
 const PET_TYPES = ["Dog", "Cat", "Bird", "Rabbit", "Other"];
+const GENDER_OPTIONS = ["Female", "Male", "Unknown"];
 const MIN_IMAGES = 1;
 const MAX_IMAGES = 5;
 
@@ -37,8 +38,21 @@ function formatDateLabel(date) {
   return date.toLocaleDateString();
 }
 
+const splitHealthLines = (value) =>
+  String(value || "")
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const formatIsoDateOnly = (value) => {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString().slice(0, 10);
+};
+
 export default function NewPetScreen() {
-  const { user } = useUser();
+  const { user, initializing } = useUser();
   const insets = useSafeAreaInsets();
   const userId = user?._id || user?.id || user?.$id || null;
 
@@ -50,10 +64,25 @@ export default function NewPetScreen() {
   const [country, setCountry] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(null);
+  const [gender, setGender] = useState("Unknown");
+  const [weight, setWeight] = useState("");
+  const [colorMarkings, setColorMarkings] = useState("");
+  const [microchipId, setMicrochipId] = useState("");
+  const [passportNumber, setPassportNumber] = useState("");
+  const [sterilized, setSterilized] = useState("no");
+  const [allergies, setAllergies] = useState("");
+  const [chronicConditions, setChronicConditions] = useState("");
+  const [currentMedication, setCurrentMedication] = useState("");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const dateLabel = useMemo(() => formatDateLabel(date), [date]);
+
+  useEffect(() => {
+    if (!initializing && !userId) {
+      router.replace("/(auth)/login");
+    }
+  }, [initializing, userId]);
 
   const addAssetsAsImages = (assets = []) => {
     if (!Array.isArray(assets) || assets.length === 0) return;
@@ -159,7 +188,7 @@ export default function NewPetScreen() {
 
   const handleSubmit = async () => {
     if (!userId) {
-      Alert.alert("Error", "You must be logged in");
+      router.replace("/(auth)/login");
       return;
     }
 
@@ -180,7 +209,7 @@ export default function NewPetScreen() {
     );
 
     if (!normalizedGovernorate.trim() || !normalizedCountry.trim()) {
-      Alert.alert("Validation Error", "Governorate and country are required");
+      Alert.alert("Validation Error", "Country / city is required");
       return;
     }
 
@@ -207,6 +236,45 @@ export default function NewPetScreen() {
           governorate: normalizedGovernorate.trim(),
           country: normalizedCountry.trim(),
         },
+        careRecord: {
+          identityProfile: {
+            petName: name.trim(),
+            species: type.trim(),
+            breed: breed.trim(),
+            gender,
+            birthDateOrAge: formatIsoDateOnly(date),
+            weight: weight.trim(),
+            colorMarkings: colorMarkings.trim(),
+            microchipId: microchipId.trim(),
+            passportNumber: passportNumber.trim(),
+            sterilized: sterilized === "yes",
+            ownerInfo: {
+              name: user?.name || "",
+              phone: user?.phone || "",
+              email: user?.email || "",
+              address: [normalizedCountry, normalizedGovernorate]
+                .filter(Boolean)
+                .join(", "),
+            },
+          },
+          medicalHistory: {
+            veterinaryVisits: [],
+            illnessesConditions: {
+              allergies: splitHealthLines(allergies),
+              chronicDiseases: splitHealthLines(chronicConditions),
+              previousSurgeries: [],
+              specialConditions: [],
+            },
+            medications: currentMedication.trim()
+              ? [
+                  {
+                    name: currentMedication.trim(),
+                  },
+                ]
+              : [],
+          },
+          vaccinations: [],
+        },
       });
 
       Alert.alert("Success", "Pet created successfully");
@@ -218,6 +286,8 @@ export default function NewPetScreen() {
       setSubmitting(false);
     }
   };
+
+  if (!userId) return null;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
@@ -291,21 +361,16 @@ export default function NewPetScreen() {
             <View style={styles.section}>
               <ThemedText style={styles.sectionTitle}>Location *</ThemedText>
 
-              <ThemedText style={styles.label}>Country</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="Tunisia"
-                value={country}
-                onChangeText={setCountry}
-              />
-
-              <ThemedText style={styles.label}>Governorate</ThemedText>
-              <GovernorateSelector
+              <ThemedText style={styles.label}>Country / City</ThemedText>
+              <LocationSelector
                 country={country}
-                value={governorate}
-                onChange={setGovernorate}
-                placeholder="Tunis"
-                inputStyle={styles.input}
+                governorate={governorate}
+                onChange={(location) => {
+                  setCountry(location.country);
+                  setGovernorate(location.governorate);
+                }}
+                placeholder="Country / City"
+                buttonStyle={styles.input}
               />
             </View>
 
@@ -402,6 +467,130 @@ export default function NewPetScreen() {
               />
             </View>
 
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>Digital Health Booklet</ThemedText>
+              <ThemedText style={styles.sectionHint}>
+                Optional details that help a veterinarian read the pet history quickly.
+              </ThemedText>
+
+              <ThemedText style={styles.label}>Gender</ThemedText>
+              <View style={styles.segmentRow}>
+                {GENDER_OPTIONS.map((option) => {
+                  const active = gender === option;
+
+                  return (
+                    <TouchableOpacity
+                      key={option}
+                      style={[
+                        styles.segmentButton,
+                        active && styles.segmentButtonActive,
+                      ]}
+                      onPress={() => setGender(option)}
+                      activeOpacity={0.86}
+                    >
+                      <ThemedText
+                        style={[
+                          styles.segmentText,
+                          active && styles.segmentTextActive,
+                        ]}
+                      >
+                        {option}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <ThemedText style={styles.label}>Weight</ThemedText>
+              <TextInput
+                style={styles.input}
+                placeholder="For example 8 kg"
+                value={weight}
+                onChangeText={setWeight}
+              />
+
+              <ThemedText style={styles.label}>Color / markings</ThemedText>
+              <TextInput
+                style={styles.input}
+                placeholder="White chest, black spot..."
+                value={colorMarkings}
+                onChangeText={setColorMarkings}
+              />
+
+              <ThemedText style={styles.label}>Microchip ID</ThemedText>
+              <TextInput
+                style={styles.input}
+                placeholder="Optional"
+                value={microchipId}
+                onChangeText={setMicrochipId}
+              />
+
+              <ThemedText style={styles.label}>Passport number</ThemedText>
+              <TextInput
+                style={styles.input}
+                placeholder="Optional"
+                value={passportNumber}
+                onChangeText={setPassportNumber}
+              />
+
+              <ThemedText style={styles.label}>Sterilized</ThemedText>
+              <View style={styles.segmentRow}>
+                {[
+                  { label: "No", value: "no" },
+                  { label: "Yes", value: "yes" },
+                ].map((option) => {
+                  const active = sterilized === option.value;
+
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[
+                        styles.segmentButton,
+                        active && styles.segmentButtonActive,
+                      ]}
+                      onPress={() => setSterilized(option.value)}
+                      activeOpacity={0.86}
+                    >
+                      <ThemedText
+                        style={[
+                          styles.segmentText,
+                          active && styles.segmentTextActive,
+                        ]}
+                      >
+                        {option.label}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <ThemedText style={styles.label}>Known allergies</ThemedText>
+              <TextInput
+                style={[styles.input, styles.smallTextArea]}
+                placeholder="One per line, if any"
+                value={allergies}
+                onChangeText={setAllergies}
+                multiline
+              />
+
+              <ThemedText style={styles.label}>Chronic conditions</ThemedText>
+              <TextInput
+                style={[styles.input, styles.smallTextArea]}
+                placeholder="One per line, if any"
+                value={chronicConditions}
+                onChangeText={setChronicConditions}
+                multiline
+              />
+
+              <ThemedText style={styles.label}>Current medication</ThemedText>
+              <TextInput
+                style={styles.input}
+                placeholder="Name or short note, if any"
+                value={currentMedication}
+                onChangeText={setCurrentMedication}
+              />
+            </View>
+
             <TouchableOpacity
               style={[styles.submitButton, submitting && styles.disabledButton]}
               onPress={handleSubmit}
@@ -463,6 +652,13 @@ const styles = StyleSheet.create({
     color: "#1D2721",
     marginBottom: 2,
   },
+  sectionHint: {
+    marginTop: 4,
+    marginBottom: 2,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: "#718077",
+  },
   label: {
     marginBottom: 8,
     marginTop: 12,
@@ -519,6 +715,10 @@ const styles = StyleSheet.create({
     minHeight: 110,
     textAlignVertical: "top",
   },
+  smallTextArea: {
+    minHeight: 76,
+    textAlignVertical: "top",
+  },
   typeRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -548,6 +748,34 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "700",
     fontSize: 14,
+  },
+  segmentRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  segmentButton: {
+    minHeight: 38,
+    minWidth: 74,
+    paddingHorizontal: 13,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#D9E1DB",
+    backgroundColor: "#F8FAF9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  segmentButtonActive: {
+    borderColor: GREEN,
+    backgroundColor: "#EAF8EE",
+  },
+  segmentText: {
+    color: "#5F6C64",
+    fontWeight: "700",
+    fontSize: 13.5,
+  },
+  segmentTextActive: {
+    color: "#1F7B39",
   },
   imageButtonsRow: {
     flexDirection: "row",

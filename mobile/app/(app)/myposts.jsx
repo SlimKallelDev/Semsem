@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
 import ThemedText from "../../components/ThemedText";
+import { getPostTypeLabel } from "../../constants/postTypes";
 import { useUser } from "../../contexts/UserContext";
 import { getPostsByUser } from "../../services/postService";
 
@@ -92,7 +93,7 @@ function PostRow({ item }) {
               ]}
             >
               <ThemedText style={[styles.tagText, { color: tColor }]}>
-                {capitalize(item.type)}
+                {getPostTypeLabel(item.type)}
               </ThemedText>
             </View>
           )}
@@ -125,7 +126,12 @@ function PostRow({ item }) {
       </View>
 
       {/* 3-dot menu */}
-      <TouchableOpacity style={styles.menuBtn} activeOpacity={0.7}>
+      <TouchableOpacity
+        style={styles.menuBtn}
+        activeOpacity={0.7}
+        onPress={() => postId && router.push(`/post/${postId}`)}
+        hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+      >
         <Ionicons name="ellipsis-vertical" size={18} color="#B0BAB5" />
       </TouchableOpacity>
     </TouchableOpacity>
@@ -157,8 +163,8 @@ function StatsRow({ posts }) {
   );
 }
 
-export default function MyPosts() {
-  const { user } = useUser();
+export default function MyPosts({ embedded = false, onCountChange } = {}) {
+  const { user, initializing } = useUser();
 
   const userId = useMemo(
     () => user?._id || user?.id || user?.$id || null,
@@ -172,28 +178,40 @@ export default function MyPosts() {
   const loadMyPosts = useCallback(async () => {
     if (!userId) {
       setPosts([]);
+      onCountChange?.(0);
       setLoading(false);
       setRefreshing(false);
       return;
     }
     try {
       const data = await getPostsByUser(userId);
-      setPosts(Array.isArray(data) ? data : []);
+      const nextPosts = Array.isArray(data) ? data : [];
+      setPosts(nextPosts);
+      onCountChange?.(nextPosts.length);
     } catch (error) {
       console.log("Get my posts error:", error.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [userId]);
+  }, [onCountChange, userId]);
 
   useEffect(() => {
     loadMyPosts();
   }, [loadMyPosts]);
 
+  useEffect(() => {
+    if (!embedded && !initializing && !userId) {
+      router.replace("/(auth)/login");
+    }
+  }, [embedded, initializing, userId]);
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={[]}>
+      <SafeAreaView
+        style={[styles.safe, embedded && styles.embeddedSafe]}
+        edges={[]}
+      >
         <View style={styles.center}>
           <ActivityIndicator size="large" color={GREEN} />
         </View>
@@ -201,18 +219,13 @@ export default function MyPosts() {
     );
   }
 
-  if (!userId) {
-    return (
-      <SafeAreaView style={styles.safe} edges={[]}>
-        <View style={styles.center}>
-          <ThemedText>You need to be logged in to see your posts.</ThemedText>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  if (!userId) return null;
 
   return (
-    <SafeAreaView style={styles.safe} edges={[]}>
+    <SafeAreaView
+      style={[styles.safe, embedded && styles.embeddedSafe]}
+      edges={[]}
+    >
       <FlatList
         data={posts}
         keyExtractor={(item) => item._id || item.id}
@@ -228,8 +241,11 @@ export default function MyPosts() {
             tintColor={GREEN}
           />
         }
-        contentContainerStyle={styles.listContent}
-        ListHeaderComponent={
+        contentContainerStyle={[
+          styles.listContent,
+          embedded && styles.embeddedListContent,
+        ]}
+        ListHeaderComponent={!embedded ? (
           <>
             <View style={styles.pageHeader}>
               <ThemedText style={styles.pageTitle}>My Posts</ThemedText>
@@ -243,7 +259,7 @@ export default function MyPosts() {
             </View>
             {posts.length > 0 && <StatsRow posts={posts} />}
           </>
-        }
+        ) : null}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="document-text-outline" size={40} color={GREEN} />
@@ -263,6 +279,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F4F6F4",
   },
+  embeddedSafe: {
+    backgroundColor: "transparent",
+  },
   center: {
     flex: 1,
     alignItems: "center",
@@ -271,6 +290,9 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 40,
+  },
+  embeddedListContent: {
+    paddingTop: 12,
   },
   pageHeader: {
     flexDirection: "row",

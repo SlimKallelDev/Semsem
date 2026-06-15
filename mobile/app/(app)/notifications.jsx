@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -79,7 +79,7 @@ const getDisplayName = (person) => {
 };
 
 export default function NotificationsScreen() {
-  const { user } = useUser();
+  const { user, initializing } = useUser();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -121,6 +121,12 @@ export default function NotificationsScreen() {
       loadNotifications();
     }, [loadNotifications])
   );
+
+  useEffect(() => {
+    if (!initializing && !user) {
+      router.replace("/(auth)/login");
+    }
+  }, [initializing, user]);
 
   const handleMarkAllRead = async () => {
     try {
@@ -182,13 +188,7 @@ export default function NotificationsScreen() {
     }
 
     if (appointmentId) {
-      router.push({
-        pathname: "/myspace",
-        params: {
-          tab: "appointments",
-          appointmentId: String(appointmentId),
-        },
-      });
+      router.push(`/appointment/${appointmentId}`);
     }
   };
 
@@ -278,15 +278,7 @@ export default function NotificationsScreen() {
     );
   }
 
-  if (!user) {
-    return (
-      <SafeAreaView style={styles.safeArea} edges={[]}>
-        <View style={styles.center}>
-          <ThemedText>You need to be logged in to see notifications.</ThemedText>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  if (!user) return null;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>

@@ -92,6 +92,8 @@ const buildPostFormData = (payload = {}) => {
   appendField(formData, "title", payload.title);
   appendField(formData, "description", payload.description);
   appendField(formData, "pet_type", payload.pet_type);
+  appendField(formData, "price", payload.price);
+  appendField(formData, "currency", payload.currency);
 
   if (payload.location !== undefined) {
     formData.append("location", JSON.stringify(payload.location || {}));

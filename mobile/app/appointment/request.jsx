@@ -71,7 +71,7 @@ const getPetSubtitle = (pet) => {
 
 export default function RequestAppointmentScreen() {
   const { providerId: rawProviderId } = useLocalSearchParams();
-  const { user } = useUser();
+  const { user, initializing } = useUser();
   const providerId = readParam(rawProviderId);
   const currentUserId = getEntityId(user);
 
@@ -101,7 +101,9 @@ export default function RequestAppointmentScreen() {
     }
 
     if (!currentUserId) {
+      if (initializing) return;
       router.replace("/(auth)/login");
+      setLoading(false);
       return;
     }
 
@@ -121,7 +123,7 @@ export default function RequestAppointmentScreen() {
     } finally {
       setLoading(false);
     }
-  }, [currentUserId, providerId]);
+  }, [currentUserId, initializing, providerId]);
 
   useEffect(() => {
     loadScreenData();
@@ -191,7 +193,7 @@ export default function RequestAppointmentScreen() {
     try {
       setSubmitting(true);
 
-      await createAppointment({
+      const createdAppointment = await createAppointment({
         provider: providerId,
         requestedFor: appointmentDate.toISOString(),
         pets: selectedPetIds,
@@ -205,11 +207,19 @@ export default function RequestAppointmentScreen() {
         [
           {
             text: "OK",
-            onPress: () =>
+            onPress: () => {
+              const createdAppointmentId = getEntityId(createdAppointment);
+
+              if (createdAppointmentId) {
+                router.replace(`/appointment/${createdAppointmentId}`);
+                return;
+              }
+
               router.replace({
                 pathname: "/myspace",
                 params: { tab: "appointments" },
-              }),
+              });
+            },
           },
         ]
       );
@@ -262,7 +272,7 @@ export default function RequestAppointmentScreen() {
               {providerName}
             </ThemedText>
             <ThemedText style={styles.providerMeta} numberOfLines={1}>
-              {[provider?.governorate || provider?.city, provider?.country]
+              {[provider?.country, provider?.governorate || provider?.city]
                 .filter(Boolean)
                 .join(", ") || "Location not shared"}
             </ThemedText>

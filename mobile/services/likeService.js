@@ -38,6 +38,21 @@ export const getLikesByPost = async (postId) => {
   }
 };
 
+export const getMyLikes = async () => {
+  try {
+    const response = await API.get("/likes/me");
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (error) {
+    console.error(
+      "getMyLikes error:",
+      error?.response?.data || error.message
+    );
+    throw new Error(
+      error?.response?.data?.message || "Failed to load your likes"
+    );
+  }
+};
+
 export const likePost = async (postId) => {
   try {
     const response = await API.post("/likes", { postId });
@@ -120,6 +135,7 @@ export const toggleLike = async (postId, userId) => {
 
 export default {
   getLikesByPost,
+  getMyLikes,
   likePost,
   unlikePost,
   isPostLiked,

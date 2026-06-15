@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -8,7 +8,6 @@ import {
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -16,12 +15,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { COUNTRIES } from "../../constants/countries";
 import {
-  getGovernoratesForCountry,
-  resolveCountryName,
-  resolveGovernorateForCountry,
-} from "../../constants/governorates";
+  getLocationSearchOptions,
+} from "../../constants/locationOptions";
 import { useLocationFilter } from "../../contexts/LocationFilterContext";
 import ThemedText from "../ThemedText";
 
@@ -43,36 +39,31 @@ export default function SharedLocationFilterBar() {
 
   const [isOpen, setIsOpen] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
-  const [countrySearch, setCountrySearch] = useState("");
-  const [draftGovernorate, setDraftGovernorate] = useState(selectedGovernorate);
-  const [draftCountry, setDraftCountry] = useState(selectedCountry);
+  const [locationSearch, setLocationSearch] = useState("");
+  const hasLocationSearch = locationSearch.trim().length > 0;
 
-  useEffect(() => {
-    setDraftGovernorate(selectedGovernorate);
-    setDraftCountry(selectedCountry);
-  }, [selectedCountry, selectedGovernorate]);
-
-  const filteredCountries = useMemo(() => {
-    if (!countrySearch.trim()) return COUNTRIES;
-    return COUNTRIES.filter((c) =>
-      c.toLowerCase().includes(countrySearch.trim().toLowerCase())
-    );
-  }, [countrySearch]);
-  const governorateOptions = useMemo(
-    () => getGovernoratesForCountry(draftCountry),
-    [draftCountry]
-  );
-  const activeDraftGovernorate = useMemo(
+  const filteredLocations = useMemo(
     () =>
-      resolveGovernorateForCountry(draftCountry, draftGovernorate, {
-        fallbackToRaw: false,
-      }),
-    [draftCountry, draftGovernorate]
+      pickerVisible && hasLocationSearch
+        ? getLocationSearchOptions(locationSearch, {
+            currentLocation: {
+              country: selectedCountry,
+              governorate: selectedGovernorate,
+            },
+          })
+        : [],
+    [
+      hasLocationSearch,
+      locationSearch,
+      pickerVisible,
+      selectedCountry,
+      selectedGovernorate,
+    ]
   );
 
   const nearMeDescription = useMemo(() => {
     if (locationLoading) {
-      return "Detecting your governorate and country...";
+      return "Detecting your country and city...";
     }
 
     if (nearbySummary) {
@@ -103,9 +94,9 @@ export default function SharedLocationFilterBar() {
 
     if (mode === "place") {
       return {
-        title: "City / country",
+        title: "Country / City",
         subtitle:
-          [selectedGovernorate, selectedCountry].filter(Boolean).join(", ") ||
+          [selectedCountry, selectedGovernorate].filter(Boolean).join(", ") ||
           "Selected area",
       };
     }
@@ -142,33 +133,13 @@ export default function SharedLocationFilterBar() {
 
   const handleClosePicker = () => {
     setPickerVisible(false);
-    setCountrySearch("");
+    setLocationSearch("");
   };
 
-  const handleCountrySelect = (item) => {
-    const nextCountry = resolveCountryName(item);
-
-    setDraftCountry(nextCountry);
-    setDraftGovernorate((current) =>
-      resolveGovernorateForCountry(nextCountry, current, {
-        fallbackToRaw: false,
-      })
-    );
-    setCountrySearch("");
-  };
-
-  const handleApplyPlace = () => {
-    const normalizedCountry = resolveCountryName(draftCountry);
-    const normalizedGovernorate = resolveGovernorateForCountry(
-      normalizedCountry,
-      draftGovernorate,
-      { fallbackToRaw: !governorateOptions.length }
-    );
-
-    if (!normalizedGovernorate.trim() && !normalizedCountry.trim()) return;
+  const handleSelectPlace = (location) => {
     applyCustomPlace({
-      governorate: normalizedGovernorate,
-      country: normalizedCountry,
+      governorate: location.governorate,
+      country: location.country,
     });
     handleClosePicker();
     setIsOpen(false);
@@ -256,7 +227,7 @@ export default function SharedLocationFilterBar() {
 
               <View style={styles.divider} />
 
-              {/* Country / Governorate */}
+              {/* Country / City */}
               <TouchableOpacity
                 style={styles.option}
                 onPress={handleOpenPicker}
@@ -266,9 +237,9 @@ export default function SharedLocationFilterBar() {
                   <Ionicons name="flag-outline" size={17} color={GREEN} />
                 </View>
                 <View style={styles.optionBody}>
-                  <ThemedText style={styles.optionTitle}>Country / Governorate</ThemedText>
+                  <ThemedText style={styles.optionTitle}>Country / City</ThemedText>
                   <ThemedText style={styles.optionDesc}>
-                    Filter by country or governorate
+                    Filter by one selected country and city
                   </ThemedText>
                 </View>
                 {mode === "place" ? (
@@ -304,7 +275,7 @@ export default function SharedLocationFilterBar() {
         </View>
       </Modal>
 
-      {/* Country / Governorate picker modal */}
+      {/* Country / City picker modal */}
       <Modal
         visible={pickerVisible}
         animationType="slide"
@@ -318,7 +289,7 @@ export default function SharedLocationFilterBar() {
           <View style={styles.pickerScreen}>
             {/* Fixed navigation-style header */}
             <View style={[styles.pickerNavBar, { paddingTop: insets.top }]}>
-              <ThemedText style={styles.pickerNavTitle}>Country / Governorate</ThemedText>
+              <ThemedText style={styles.pickerNavTitle}>Country / City</ThemedText>
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={handleClosePicker}
@@ -331,96 +302,59 @@ export default function SharedLocationFilterBar() {
             {/* Scrollable content */}
             <View style={styles.pickerContent}>
               <ThemedText style={styles.pickerSubtitle}>
-                Pick a country, a governorate, or both.
+                Search by country or city, then select one entry.
               </ThemedText>
-
-              {governorateOptions.length > 0 ? (
-                <View style={styles.governoratePickerCard}>
-                  <ThemedText style={styles.governoratePickerTitle}>
-                    Governorate in {resolveCountryName(draftCountry)}
-                  </ThemedText>
-                  <ScrollView
-                    style={styles.governoratePickerList}
-                    contentContainerStyle={styles.governorateChipWrap}
-                    nestedScrollEnabled
-                    keyboardShouldPersistTaps="handled"
-                  >
-                    {governorateOptions.map((item) => {
-                      const active = activeDraftGovernorate === item;
-
-                      return (
-                        <TouchableOpacity
-                          key={item}
-                          style={[
-                            styles.governorateChip,
-                            active && styles.governorateChipActive,
-                          ]}
-                          onPress={() => setDraftGovernorate(item)}
-                          activeOpacity={0.86}
-                        >
-                          <ThemedText
-                            style={[
-                              styles.governorateChipText,
-                              active && styles.governorateChipTextActive,
-                            ]}
-                          >
-                            {item}
-                          </ThemedText>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-              ) : (
-                <TextInput
-                  style={styles.cityInput}
-                  placeholder="Governorate (optional)"
-                  placeholderTextColor="#97A29B"
-                  value={draftGovernorate}
-                  onChangeText={setDraftGovernorate}
-                />
-              )}
 
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search country"
+                placeholder="Search city or country"
                 placeholderTextColor="#97A29B"
-                value={countrySearch}
-                onChangeText={setCountrySearch}
+                value={locationSearch}
+                onChangeText={setLocationSearch}
+                autoCapitalize="words"
+                autoCorrect={false}
               />
 
               <FlatList
-                data={filteredCountries}
-                keyExtractor={(item) => item}
+                data={filteredLocations}
+                keyExtractor={(item) => item.key}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
-                style={styles.countryList}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.countryItem}
-                    onPress={() => handleCountrySelect(item)}
-                  >
-                    <ThemedText style={styles.countryItemText}>{item}</ThemedText>
-                    {draftCountry === item && (
-                      <Ionicons name="checkmark" size={20} color={GREEN} />
-                    )}
-                  </TouchableOpacity>
-                )}
-              />
+                style={styles.locationList}
+                ListEmptyComponent={
+                  <View style={styles.emptyState}>
+                    <Ionicons name="search-outline" size={22} color="#A5B0AA" />
+                    <ThemedText style={styles.emptyText}>
+                      {hasLocationSearch
+                        ? "No location found. Try Tunis, Sousse, or Paris."
+                        : "Start typing to search locations."}
+                    </ThemedText>
+                  </View>
+                }
+                renderItem={({ item }) => {
+                  const active =
+                    selectedCountry === item.country &&
+                    selectedGovernorate === item.governorate;
 
-              <TouchableOpacity
-                style={[
-                  styles.applyButton,
-                  !draftGovernorate.trim() &&
-                    !draftCountry.trim() &&
-                    styles.applyButtonDisabled,
-                ]}
-                onPress={handleApplyPlace}
-                disabled={!draftGovernorate.trim() && !draftCountry.trim()}
-                activeOpacity={0.88}
-              >
-                <ThemedText style={styles.applyButtonText}>Apply</ThemedText>
-              </TouchableOpacity>
+                  return (
+                    <TouchableOpacity
+                      style={styles.locationItem}
+                      onPress={() => handleSelectPlace(item)}
+                      activeOpacity={0.84}
+                    >
+                      <View style={styles.locationItemIcon}>
+                        <Ionicons name="location-outline" size={17} color={GREEN} />
+                      </View>
+                      <ThemedText style={styles.locationItemText}>
+                        {item.label}
+                      </ThemedText>
+                      {active ? (
+                        <Ionicons name="checkmark-circle" size={21} color={GREEN} />
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                }}
+              />
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -539,7 +473,7 @@ const styles = StyleSheet.create({
     marginRight: 18,
   },
 
-  /* Country/Governorate picker modal */
+  /* Country/City picker modal */
   pickerScreen: {
     flex: 1,
     backgroundColor: "#FFFFFF",
@@ -580,59 +514,6 @@ const styles = StyleSheet.create({
     color: "#748078",
     marginBottom: 16,
   },
-  cityInput: {
-    height: 50,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#DCE6DD",
-    backgroundColor: "#FAFCFA",
-    paddingHorizontal: 14,
-    fontSize: 15,
-    color: "#172119",
-    marginBottom: 12,
-  },
-  governoratePickerCard: {
-    borderWidth: 1,
-    borderColor: "#DCE6DD",
-    borderRadius: 14,
-    backgroundColor: "#FAFCFA",
-    padding: 12,
-    marginBottom: 12,
-  },
-  governoratePickerTitle: {
-    marginBottom: 10,
-    color: "#4E5D53",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  governoratePickerList: {
-    maxHeight: 136,
-  },
-  governorateChipWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  governorateChip: {
-    borderWidth: 1,
-    borderColor: "#D7E2DB",
-    borderRadius: 18,
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  governorateChipActive: {
-    borderColor: GREEN,
-    backgroundColor: GREEN,
-  },
-  governorateChipText: {
-    color: "#546258",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  governorateChipTextActive: {
-    color: "#FFFFFF",
-  },
   searchInput: {
     height: 50,
     borderRadius: 14,
@@ -644,38 +525,45 @@ const styles = StyleSheet.create({
     color: "#172119",
     marginBottom: 12,
   },
-  countryList: {
+  locationList: {
     flex: 1,
   },
-  countryItem: {
-    minHeight: 56,
+  locationItem: {
+    minHeight: 58,
     borderBottomWidth: 1,
     borderBottomColor: "#EEF2EF",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
   },
-  countryItemText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#233128",
-  },
-  applyButton: {
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: GREEN,
+  locationItemIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: "#EAF8EE",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 14,
-    marginBottom: 8,
+    marginRight: 10,
   },
-  applyButtonDisabled: {
-    opacity: 0.4,
-  },
-  applyButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
+  locationItemText: {
+    flex: 1,
+    fontSize: 15,
     fontWeight: "800",
+    color: "#233128",
+    marginRight: 8,
+  },
+  emptyState: {
+    minHeight: 140,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  emptyText: {
+    marginTop: 8,
+    textAlign: "center",
+    color: "#7F8A84",
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 19,
   },
 });
 

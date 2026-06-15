@@ -50,6 +50,19 @@ const postSchema = new mongoose.Schema(
       index: true,
     },
 
+    price: {
+      type: Number,
+      min: [0, "Price cannot be negative"],
+      default: null,
+    },
+
+    currency: {
+      type: String,
+      default: "",
+      trim: true,
+      uppercase: true,
+    },
+
     location: {
       governorate: {
         type: String,

@@ -18,7 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AppTopBar from "../../../components/AppTopBar";
-import GovernorateSelector from "../../../components/location/GovernorateSelector";
+import LocationSelector from "../../../components/location/LocationSelector";
 import ThemedText from "../../../components/ThemedText";
 import ThemedView from "../../../components/ThemedView";
 import {
@@ -228,7 +228,7 @@ export default function EditPetScreen() {
     );
 
     if (!normalizedGovernorate.trim() || !normalizedCountry.trim()) {
-      Alert.alert("Validation Error", "Governorate and country are required");
+      Alert.alert("Validation Error", "Country / city is required");
       return;
     }
 
@@ -349,21 +349,16 @@ export default function EditPetScreen() {
             <View style={styles.section}>
               <ThemedText style={styles.sectionTitle}>Location *</ThemedText>
 
-              <ThemedText style={styles.label}>Country</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="Tunisia"
-                value={country}
-                onChangeText={setCountry}
-              />
-
-              <ThemedText style={styles.label}>Governorate</ThemedText>
-              <GovernorateSelector
+              <ThemedText style={styles.label}>Country / City</ThemedText>
+              <LocationSelector
                 country={country}
-                value={governorate}
-                onChange={setGovernorate}
-                placeholder="Tunis"
-                inputStyle={styles.input}
+                governorate={governorate}
+                onChange={(location) => {
+                  setCountry(location.country);
+                  setGovernorate(location.governorate);
+                }}
+                placeholder="Country / City"
+                buttonStyle={styles.input}
               />
             </View>
 

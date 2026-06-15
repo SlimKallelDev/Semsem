@@ -180,27 +180,6 @@ export default function AppLayout() {
           }}
         >
           <Tabs.Screen
-            name="messages"
-            options={{
-              title: "Messages",
-              tabBarBadge:
-                unreadMessageCount > 0
-                  ? unreadMessageCount > 9
-                    ? "9+"
-                    : unreadMessageCount
-                  : undefined,
-              tabBarBadgeStyle: styles.messageTabBadge,
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons
-                  name="chatbubbles-outline"
-                  size={size}
-                  color={color}
-                />
-              ),
-            }}
-          />
-
-          <Tabs.Screen
             name="notifications"
             options={{
               title: "Notifications",
@@ -214,6 +193,27 @@ export default function AppLayout() {
               tabBarIcon: ({ color, size }) => (
                 <Ionicons
                   name="notifications-outline"
+                  size={size}
+                  color={color}
+                />
+              ),
+            }}
+          />
+
+          <Tabs.Screen
+            name="messages"
+            options={{
+              title: "Messages",
+              tabBarBadge:
+                unreadMessageCount > 0
+                  ? unreadMessageCount > 9
+                    ? "9+"
+                    : unreadMessageCount
+                  : undefined,
+              tabBarBadgeStyle: styles.messageTabBadge,
+              tabBarIcon: ({ color, size }) => (
+                <Ionicons
+                  name="chatbubbles-outline"
                   size={size}
                   color={color}
                 />
@@ -237,6 +237,24 @@ export default function AppLayout() {
           />
 
           <Tabs.Screen
+            name="activity"
+            listeners={{
+              tabPress: (event) => {
+                if (!isLoggedIn) {
+                  event.preventDefault();
+                  router.push("/(auth)/login");
+                }
+              },
+            }}
+            options={{
+              title: "Activity",
+              tabBarIcon: ({ color, size }) => (
+                <Ionicons name="pulse-outline" size={size} color={color} />
+              ),
+            }}
+          />
+
+          <Tabs.Screen
             name="myspace"
             options={{
               title: "My Space",
@@ -249,10 +267,7 @@ export default function AppLayout() {
           <Tabs.Screen
             name="marketplace"
             options={{
-              title: "Marketplace",
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="storefront-outline" size={size} color={color} />
-              ),
+              href: null,
             }}
           />
 

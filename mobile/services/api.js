@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import { emitAuthExpired } from "./authEvents";
 
-const DEFAULT_LOCAL_HOST = "192.168.0.110";
+const DEFAULT_LOCAL_HOST = "172.20.10.4";
 const DEFAULT_API_PORT = "5000";
 const REQUEST_TIMEOUT_MS = 20000;
 const MAX_RETRIES = 1;

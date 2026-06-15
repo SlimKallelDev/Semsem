@@ -3,6 +3,10 @@ import { router, usePathname } from "expo-router";
 import { useMemo } from "react";
 import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
 
+import {
+  CHROME_DIVIDER_COLOR,
+  CHROME_DIVIDER_HEIGHT,
+} from "../constants/chromeLayout";
 import { useUser } from "../contexts/UserContext";
 import ThemedText from "./ThemedText";
 
@@ -37,6 +41,23 @@ export default function AppTopBar({
     router.push("/(auth)/login");
   };
 
+  const handleBackPress = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+
+    const canGoBack =
+      typeof router.canGoBack === "function" ? router.canGoBack() : true;
+
+    if (canGoBack) {
+      router.back();
+      return;
+    }
+
+    router.replace("/home");
+  };
+
   return (
     <View style={styles.wrapper}>
       <View style={styles.headerRow}>
@@ -67,32 +88,35 @@ export default function AppTopBar({
       </View>
 
       {showBack ? (
-        <View style={styles.container}>
-          <TouchableOpacity
-            style={styles.backButton}
-            activeOpacity={0.82}
-            onPress={onBack || (() => router.back())}
-          >
-            <Ionicons name="chevron-back" size={24} color="#19201B" />
-          </TouchableOpacity>
-
-          {centerContent ? (
+        <>
+          <View style={styles.headerDivider} />
+          <View style={styles.container}>
             <TouchableOpacity
-              style={styles.centerContentButton}
-              activeOpacity={onCenterPress && !centerDisabled ? 0.85 : 1}
-              onPress={onCenterPress}
-              disabled={!onCenterPress || centerDisabled}
+              style={styles.backButton}
+              activeOpacity={0.82}
+              onPress={handleBackPress}
             >
-              {centerContent}
+              <Ionicons name="chevron-back" size={24} color="#19201B" />
             </TouchableOpacity>
-          ) : (
-            <ThemedText style={styles.title} numberOfLines={1}>
-              {title}
-            </ThemedText>
-          )}
 
-          <View style={styles.spacer} />
-        </View>
+            {centerContent ? (
+              <TouchableOpacity
+                style={styles.centerContentButton}
+                activeOpacity={onCenterPress && !centerDisabled ? 0.85 : 1}
+                onPress={onCenterPress}
+                disabled={!onCenterPress || centerDisabled}
+              >
+                {centerContent}
+              </TouchableOpacity>
+            ) : (
+              <ThemedText style={styles.title} numberOfLines={1}>
+                {title}
+              </ThemedText>
+            )}
+
+            <View style={styles.spacer} />
+          </View>
+        </>
       ) : null}
     </View>
   );
@@ -101,8 +125,13 @@ export default function AppTopBar({
 const styles = StyleSheet.create({
   wrapper: {
     backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#EEF3EF",
+    borderBottomWidth: CHROME_DIVIDER_HEIGHT,
+    borderBottomColor: CHROME_DIVIDER_COLOR,
+  },
+  headerDivider: {
+    height: CHROME_DIVIDER_HEIGHT,
+    backgroundColor: CHROME_DIVIDER_COLOR,
+    marginHorizontal: 16,
   },
   headerRow: {
     flexDirection: "row",
@@ -136,7 +165,7 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#E8ECE9",
+    borderColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",

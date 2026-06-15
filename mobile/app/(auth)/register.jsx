@@ -19,12 +19,10 @@ import Spacer from "../../components/Spacer";
 import ThemedText from "../../components/ThemedText";
 import ThemedTextInput from "../../components/ThemedTextInput";
 import ThemedButton from "../../components/ThemedButton";
-import CountrySelector from "../../components/location/CountrySelector";
-import GovernorateSelector from "../../components/location/GovernorateSelector";
+import LocationSelector from "../../components/location/LocationSelector";
 import { useUser } from "../../contexts/UserContext";
 import { PROFILE_TYPES } from "../../constants/profileTypes";
 import {
-  hasGovernorateListForCountry,
   resolveCountryName,
   resolveGovernorateForCountry,
 } from "../../constants/governorates";
@@ -165,34 +163,21 @@ export default function Register() {
               <ThemedText style={styles.fieldLabel}>Location *</ThemedText>
               <View style={styles.locationCard}>
                 <ThemedText style={styles.locationHint}>
-                  Choose your country and governorate so Semsem can match nearby
+                  Choose your country and city so Semsem can match nearby
                   posts, pets, and services.
                 </ThemedText>
 
-                <CountrySelector
-                  value={country}
-                  onChange={(nextCountry) => {
-                    setCountry(nextCountry);
-                    setGovernorate((current) =>
-                      hasGovernorateListForCountry(nextCountry)
-                        ? resolveGovernorateForCountry(nextCountry, current, {
-                            fallbackToRaw: false,
-                          })
-                        : ""
-                    );
-                  }}
-                  placeholder="Select your country"
-                  buttonStyle={styles.locationInput}
-                />
-
-                <View style={styles.locationGap} />
-
-                <GovernorateSelector
+                <LocationSelector
                   country={country}
-                  value={governorate}
-                  onChange={setGovernorate}
-                  placeholder="Select or enter governorate"
-                  inputStyle={styles.locationInput}
+                  governorate={governorate}
+                  onChange={(location) => {
+                    setCountry(location.country);
+                    setGovernorate(location.governorate);
+                  }}
+                  placeholder="Country / City"
+                  buttonStyle={styles.locationInput}
+                  title="Select Location"
+                  subtitle="Search city or country and choose one entry"
                 />
               </View>
 
@@ -296,9 +281,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 13,
-  },
-  locationGap: {
-    height: 10,
   },
   buttonDisabled: { opacity: 0.7 },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },

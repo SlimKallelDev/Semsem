@@ -68,6 +68,21 @@ const getCommentsByPost = async (req, res, next) => {
   }
 };
 
+const getMyComments = async (req, res, next) => {
+  try {
+    const userId = req.user?.userId;
+
+    const comments = await Comment.find({ user: userId })
+      .populate("post", "_id title image images type user")
+      .populate("user", USER_PUBLIC_FIELDS)
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(comments);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const updateComment = async (req, res, next) => {
   try {
     const { text } = req.body;
@@ -147,6 +162,7 @@ const deleteComment = async (req, res, next) => {
 module.exports = {
   createComment,
   getCommentsByPost,
+  getMyComments,
   updateComment,
   deleteComment,
 };

@@ -54,7 +54,7 @@ const getDisplayName = (person) => {
 };
 
 const getLocationText = (provider) =>
-  [provider?.governorate || provider?.city, provider?.country]
+  [provider?.country, provider?.governorate || provider?.city]
     .filter(Boolean)
     .join(", ");
 

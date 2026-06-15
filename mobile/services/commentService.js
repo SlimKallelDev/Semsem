@@ -57,6 +57,23 @@ export const getCommentsByPost = async (postId) => {
   }
 };
 
+export const getMyComments = async () => {
+  try {
+    const response = await API.get("/comments/me");
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (error) {
+    console.error(
+      "getMyComments error:",
+      error?.response?.data || error.message
+    );
+    throw new Error(
+      error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        "Failed to load your comments"
+    );
+  }
+};
+
 export const updateComment = async (id, text) => {
   try {
     const response = await API.put(`/comments/${id}`, { text });
@@ -94,6 +111,7 @@ export const deleteComment = async (id) => {
 export default {
   createComment,
   getCommentsByPost,
+  getMyComments,
   updateComment,
   deleteComment,
 };

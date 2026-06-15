@@ -20,11 +20,9 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import UserOnly from "../../components/auth/UserOnly";
-import CountrySelector from "../../components/location/CountrySelector";
-import GovernorateSelector from "../../components/location/GovernorateSelector";
+import LocationSelector from "../../components/location/LocationSelector";
 import ThemedText from "../../components/ThemedText";
 import {
-  hasGovernorateListForCountry,
   resolveCountryName,
   resolveGovernorateForCountry,
 } from "../../constants/governorates";
@@ -183,7 +181,7 @@ export default function ProfileScreen() {
     profile?.bio?.trim() ||
     `Animal lover | ${pluralize(petsCount, "pet")} parent`;
   const locationText =
-    [profile?.governorate || profile?.city, profile?.country]
+    [profile?.country, profile?.governorate || profile?.city]
       .filter(Boolean)
       .join(", ") ||
     "Add your location";
@@ -216,18 +214,6 @@ export default function ProfileScreen() {
     setForm((current) => ({
       ...current,
       [key]: value,
-    }));
-  };
-
-  const updateProfileCountry = (nextCountry) => {
-    setForm((current) => ({
-      ...current,
-      country: nextCountry,
-      governorate: hasGovernorateListForCountry(nextCountry)
-        ? resolveGovernorateForCountry(nextCountry, current.governorate, {
-            fallbackToRaw: false,
-          })
-        : "",
     }));
   };
 
@@ -733,27 +719,23 @@ export default function ProfileScreen() {
                   returnKeyType="next"
                 />
 
-                {/* Country */}
-                <ThemedText style={styles.fieldLabel}>Country</ThemedText>
-                <CountrySelector
-                  value={form.country}
-                  onChange={updateProfileCountry}
-                  placeholder="Select a country"
+                {/* Location */}
+                <ThemedText style={styles.fieldLabel}>Country / City</ThemedText>
+                <LocationSelector
+                  country={form.country}
+                  governorate={form.governorate}
+                  onChange={(location) =>
+                    setForm((current) => ({
+                      ...current,
+                      country: location.country,
+                      governorate: location.governorate,
+                    }))
+                  }
+                  placeholder="Country / City"
                   placeholderTextColor="#A8B5AE"
                   buttonStyle={styles.input}
                   disabled={saving}
-                />
-
-                {/* Governorate */}
-                <ThemedText style={styles.fieldLabel}>Governorate</ThemedText>
-                <GovernorateSelector
-                  country={form.country}
-                  value={form.governorate}
-                  onChange={(v) => updateForm("governorate", v)}
-                  placeholder="e.g. Cairo"
-                  placeholderTextColor="#A8B5AE"
-                  inputStyle={styles.input}
-                  disabled={saving}
+                  allowClear
                 />
 
                 {/* Bio */}

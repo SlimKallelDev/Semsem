@@ -1,6 +1,6 @@
 {
   "expo": {
-    "scheme": "Semsemapp",
+    "scheme": "semsemapp",
     "name": "Semsem",
     "slug": "Semsem",
     "version": "1.0.0",
@@ -32,7 +32,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow Semsem to detect your governorate and country for Near me filters."
+          "locationWhenInUsePermission": "Allow Semsem to detect your country and city for Near me filters."
         }
       ]
     ]

@@ -49,12 +49,20 @@ const CATEGORY_STYLES = {
     icon: "heart",
     iconColor: "#D9649A",
   },
+  sale: {
+    label: "SALE",
+    backgroundColor: "#FFF7E8",
+    borderColor: "#FFE1AD",
+    textColor: "#A86513",
+    icon: "pricetag",
+    iconColor: "#D88C23",
+  },
   general: {
-    label: "GENERAL",
+    label: "QUESTION",
     backgroundColor: "#F3FBF5",
     borderColor: "#DDEEE1",
     textColor: "#3C9C5A",
-    icon: "paw",
+    icon: "help-circle",
     iconColor: "#3C9C5A",
   },
 };
@@ -75,7 +83,15 @@ const STATUS_STYLES = {
 };
 
 function getCategoryMeta(type) {
-  return CATEGORY_STYLES[(type || "general").toLowerCase()] || CATEGORY_STYLES.general;
+  const normalized = String(type || "general")
+    .trim()
+    .toLowerCase();
+  const category =
+    ["vente", "sell", "selling", "for_sale", "for-sale"].includes(normalized)
+      ? "sale"
+      : normalized;
+
+  return CATEGORY_STYLES[category] || CATEGORY_STYLES.general;
 }
 
 function getStatusMeta(status) {
@@ -95,6 +111,30 @@ function parseLikesCount(post) {
 function parseCommentsCount(post) {
   const count = Number(post?.comments_count);
   return Number.isFinite(count) ? count : 0;
+}
+
+function formatSalePrice(post) {
+  const rawPrice = post?.price ?? post?.salePrice ?? post?.priceAmount;
+  const price = Number(String(rawPrice ?? "").trim().replace(",", "."));
+
+  if (!Number.isFinite(price) || price <= 0) return "";
+
+  return Number.isInteger(price)
+    ? String(price)
+    : price.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function formatSaleBadgeLabel(post, categoryMeta) {
+  if (categoryMeta !== CATEGORY_STYLES.sale) return categoryMeta.label;
+
+  const price = formatSalePrice(post);
+  const currency = String(post?.currency || post?.priceCurrency || "")
+    .trim()
+    .toUpperCase();
+
+  return price && currency
+    ? `${categoryMeta.label} - ${price} ${currency}`
+    : categoryMeta.label;
 }
 
 function getEntityId(value) {
@@ -119,6 +159,7 @@ function getDisplayName(user) {
 export default function PostCard({ post, inGroupedSection = false }) {
   const { user } = useUser();
   const categoryMeta = getCategoryMeta(post.type);
+  const categoryBadgeLabel = formatSaleBadgeLabel(post, categoryMeta);
   const statusMeta = getStatusMeta(post.status);
   const isVeterinaryAuthor = isVeterinaryUser(post?.user);
   const petType = post.pet_type || post.petType || "Unknown";
@@ -140,8 +181,8 @@ export default function PostCard({ post, inGroupedSection = false }) {
     if (!post.location) return "";
 
     const parts = [
-      post.location.governorate || post.location.city,
       post.location.country,
+      post.location.governorate || post.location.city,
     ].filter(Boolean);
     return parts.join(", ");
   };
@@ -267,8 +308,9 @@ export default function PostCard({ post, inGroupedSection = false }) {
                 styles.categoryBadgeText,
                 { color: categoryMeta.textColor },
               ]}
+              numberOfLines={1}
             >
-              {categoryMeta.label}
+              {categoryBadgeLabel}
             </ThemedText>
           </View>
         </View>
@@ -453,6 +495,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 16,
     left: 16,
+    maxWidth: "88%",
     height: 32,
     borderRadius: 16,
     paddingHorizontal: 12,

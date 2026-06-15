@@ -115,8 +115,23 @@ const getLikesByPost = async (req, res, next) => {
   }
 };
 
+const getMyLikes = async (req, res, next) => {
+  try {
+    const userId = req.user?.userId;
+
+    const likes = await Like.find({ user: userId })
+      .populate("post", "_id title image images type user")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(likes);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   likePost,
   unlikePost,
   getLikesByPost,
+  getMyLikes,
 };

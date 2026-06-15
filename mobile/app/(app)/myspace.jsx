@@ -18,16 +18,50 @@ import {
   getAppointments,
   updateAppointmentStatus,
 } from "../../services/appointmentService";
+import { getPetsByOwner } from "../../services/petService";
+import { getPostsByUser } from "../../services/postService";
 import MyPetsScreen from "./mypets";
 import MyPosts from "./myposts";
 
 const GREEN = "#3DB85C";
 const GREEN_DARK = "#227B3E";
+const PAGE_BG = "#F4F6F4";
+const SURFACE = "#FFFFFF";
+const INK = "#17201A";
+const MUTED = "#68746D";
+const BORDER = "#E1ECE5";
 const TABS = [
-  { value: "pets", label: "Pets", icon: "paw-outline" },
-  { value: "posts", label: "Posts", icon: "document-text-outline" },
-  { value: "appointments", label: "Appointments", icon: "calendar-outline" },
+  {
+    value: "pets",
+    label: "Pets",
+    icon: "paw-outline",
+    description: "Profiles and care",
+  },
+  {
+    value: "posts",
+    label: "Posts",
+    icon: "document-text-outline",
+    description: "Posts you created",
+  },
+  {
+    value: "appointments",
+    label: "Appointments",
+    icon: "calendar-outline",
+    description: "Service requests",
+  },
 ];
+const TAB_ACTIONS = {
+  pets: {
+    label: "Add pet",
+    icon: "add",
+    route: "/pet/new-pet",
+  },
+  posts: {
+    label: "New post",
+    icon: "add",
+    route: "/post/new-post",
+  },
+};
 
 const getEntityId = (value) => {
   if (!value) return null;
@@ -38,6 +72,10 @@ const getEntityId = (value) => {
 const getDisplayName = (person) => {
   const explicit = String(person?.name || "").trim();
   return explicit || person?.email || "Semsem user";
+};
+
+const formatCount = (count) => {
+  return Number.isFinite(count) ? String(count) : "--";
 };
 
 const readParam = (value) => {
@@ -128,7 +166,7 @@ function AppointmentStatusPill({ status }) {
   );
 }
 
-function AppointmentsPanel() {
+function AppointmentsPanel({ onCountChange }) {
   const { user } = useUser();
   const currentUserId = getEntityId(user);
   const [appointments, setAppointments] = useState([]);
@@ -139,6 +177,7 @@ function AppointmentsPanel() {
   const loadAppointments = useCallback(async (isRefresh = false) => {
     if (!currentUserId) {
       setAppointments([]);
+      onCountChange?.(0);
       setLoading(false);
       setRefreshing(false);
       return;
@@ -152,14 +191,16 @@ function AppointmentsPanel() {
       }
 
       const data = await getAppointments();
-      setAppointments(Array.isArray(data) ? data : []);
+      const nextAppointments = Array.isArray(data) ? data : [];
+      setAppointments(nextAppointments);
+      onCountChange?.(nextAppointments.length);
     } catch (error) {
       console.log("Load appointments error:", error?.message || error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [currentUserId]);
+  }, [currentUserId, onCountChange]);
 
   useFocusEffect(
     useCallback(() => {
@@ -194,7 +235,11 @@ function AppointmentsPanel() {
     const updating = updatingId && String(updatingId) === String(appointmentId);
 
     return (
-      <View style={styles.appointmentCard}>
+      <TouchableOpacity
+        style={styles.appointmentCard}
+        activeOpacity={0.9}
+        onPress={() => appointmentId && router.push(`/appointment/${appointmentId}`)}
+      >
         <View style={styles.appointmentTopRow}>
           <View style={styles.appointmentIcon}>
             <Ionicons name="calendar" size={20} color={GREEN} />
@@ -270,7 +315,14 @@ function AppointmentsPanel() {
             <ThemedText style={styles.cancelButtonText}>Cancel request</ThemedText>
           </TouchableOpacity>
         ) : null}
-      </View>
+
+        <View style={styles.appointmentDetailsHint}>
+          <ThemedText style={styles.appointmentDetailsHintText}>
+            View details
+          </ThemedText>
+          <Ionicons name="chevron-forward" size={14} color={GREEN_DARK} />
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -316,11 +368,25 @@ function AppointmentsPanel() {
 
 export default function MySpaceScreen() {
   const params = useLocalSearchParams();
+  const { user, initializing } = useUser();
   const [activeTab, setActiveTab] = useState(() => resolveTab(params?.tab));
-  const activeTitle = useMemo(
-    () => TABS.find((tab) => tab.value === activeTab)?.label || "Pets",
+  const [sectionCounts, setSectionCounts] = useState({
+    pets: null,
+    posts: null,
+    appointments: null,
+  });
+  const activeSection = useMemo(
+    () => TABS.find((tab) => tab.value === activeTab) || TABS[0],
     [activeTab]
   );
+  const activeAction = TAB_ACTIONS[activeTab] || null;
+  const userId = getEntityId(user);
+
+  useEffect(() => {
+    if (!initializing && !userId) {
+      router.replace("/(auth)/login");
+    }
+  }, [initializing, userId]);
 
   useEffect(() => {
     const nextTab = resolveParamTab(params?.tab);
@@ -329,52 +395,172 @@ export default function MySpaceScreen() {
     setActiveTab((current) => (current === nextTab ? current : nextTab));
   }, [params?.tab]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    if (!userId) {
+      setSectionCounts({
+        pets: 0,
+        posts: 0,
+        appointments: 0,
+      });
+      return () => {
+        mounted = false;
+      };
+    }
+
+    const loadSectionCounts = async () => {
+      const [petsData, postsData, appointmentsData] = await Promise.all([
+        getPetsByOwner(userId).catch(() => []),
+        getPostsByUser(userId).catch(() => []),
+        getAppointments().catch(() => []),
+      ]);
+
+      if (!mounted) return;
+
+      setSectionCounts({
+        pets: Array.isArray(petsData) ? petsData.length : 0,
+        posts: Array.isArray(postsData) ? postsData.length : 0,
+        appointments: Array.isArray(appointmentsData)
+          ? appointmentsData.length
+          : 0,
+      });
+    };
+
+    loadSectionCounts();
+
+    return () => {
+      mounted = false;
+    };
+  }, [userId]);
+
   const handleChangeTab = (tabValue) => {
     setActiveTab(tabValue);
     router.setParams({ tab: tabValue });
   };
 
+  const updateSectionCount = useCallback((section, count) => {
+    setSectionCounts((current) => {
+      if (current[section] === count) return current;
+      return { ...current, [section]: count };
+    });
+  }, []);
+
+  const handlePetsCountChange = useCallback(
+    (count) => updateSectionCount("pets", count),
+    [updateSectionCount]
+  );
+
+  const handlePostsCountChange = useCallback(
+    (count) => updateSectionCount("posts", count),
+    [updateSectionCount]
+  );
+
+  const handleAppointmentsCountChange = useCallback(
+    (count) => updateSectionCount("appointments", count),
+    [updateSectionCount]
+  );
+
+  if (!userId) return null;
+
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>
-      <View style={styles.header}>
-        <View>
-          <ThemedText style={styles.eyebrow}>Personal area</ThemedText>
-          <ThemedText style={styles.title}>My Space</ThemedText>
-        </View>
-        <ThemedText style={styles.activeTitle}>{activeTitle}</ThemedText>
-      </View>
+      <View style={styles.sectionDeck}>
+        <View style={styles.deckHeader}>
+          <ThemedText style={styles.deckTitle}>My Space</ThemedText>
+          <View style={styles.deckHeaderRight}>
+            <ThemedText style={styles.deckCurrent} numberOfLines={1}>
+              {activeSection.label}
+            </ThemedText>
 
-      <View style={styles.segmentedNav}>
-        {TABS.map((tab) => {
-          const active = activeTab === tab.value;
-
-          return (
-            <TouchableOpacity
-              key={tab.value}
-              style={[styles.navButton, active && styles.navButtonActive]}
-              activeOpacity={0.86}
-              onPress={() => handleChangeTab(tab.value)}
-            >
-              <Ionicons
-                name={tab.icon}
-                size={15}
-                color={active ? "#FFFFFF" : "#68746D"}
-              />
-              <ThemedText
-                style={[styles.navButtonText, active && styles.navButtonTextActive]}
-                numberOfLines={1}
+            {activeAction ? (
+              <TouchableOpacity
+                style={styles.deckActionButton}
+                activeOpacity={0.86}
+                onPress={() => router.push(activeAction.route)}
               >
-                {tab.label}
-              </ThemedText>
-            </TouchableOpacity>
-          );
-        })}
+                <Ionicons name={activeAction.icon} size={16} color="#FFFFFF" />
+                <ThemedText style={styles.deckActionText}>
+                  {activeAction.label}
+                </ThemedText>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+
+        <View style={styles.sectionCards}>
+          {TABS.map((tab) => {
+            const active = activeTab === tab.value;
+
+            return (
+              <TouchableOpacity
+                key={tab.value}
+                style={[styles.sectionCard, active && styles.sectionCardActive]}
+                activeOpacity={0.88}
+                onPress={() => handleChangeTab(tab.value)}
+              >
+                <View style={styles.sectionCardTop}>
+                  <View
+                    style={[
+                      styles.sectionIcon,
+                      active && styles.sectionIconActive,
+                    ]}
+                  >
+                    <Ionicons
+                      name={tab.icon}
+                      size={18}
+                      color={active ? "#FFFFFF" : GREEN_DARK}
+                    />
+                  </View>
+
+                  <View
+                    style={[
+                      styles.sectionCountPill,
+                      active && styles.sectionCountPillActive,
+                    ]}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.sectionCountText,
+                        active && styles.sectionCountTextActive,
+                      ]}
+                    >
+                      {formatCount(sectionCounts[tab.value])}
+                    </ThemedText>
+                  </View>
+                </View>
+
+                <ThemedText
+                  style={[styles.sectionLabel, active && styles.sectionLabelActive]}
+                  numberOfLines={1}
+                >
+                  {tab.label}
+                </ThemedText>
+                <ThemedText
+                  style={[
+                    styles.sectionDescription,
+                    active && styles.sectionDescriptionActive,
+                  ]}
+                  numberOfLines={2}
+                >
+                  {tab.description}
+                </ThemedText>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
 
       <View style={styles.content}>
-        {activeTab === "pets" ? <MyPetsScreen /> : null}
-        {activeTab === "posts" ? <MyPosts /> : null}
-        {activeTab === "appointments" ? <AppointmentsPanel /> : null}
+        {activeTab === "pets" ? (
+          <MyPetsScreen embedded onCountChange={handlePetsCountChange} />
+        ) : null}
+        {activeTab === "posts" ? (
+          <MyPosts embedded onCountChange={handlePostsCountChange} />
+        ) : null}
+        {activeTab === "appointments" ? (
+          <AppointmentsPanel onCountChange={handleAppointmentsCountChange} />
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -383,70 +569,136 @@ export default function MySpaceScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F4F6F4",
+    backgroundColor: PAGE_BG,
   },
-  header: {
-    backgroundColor: "#FFFFFF",
+  sectionDeck: {
+    backgroundColor: SURFACE,
     borderBottomWidth: 1,
-    borderBottomColor: "#E4ECE7",
+    borderBottomColor: BORDER,
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 8,
+    paddingTop: 12,
+    paddingBottom: 12,
+  },
+  deckHeader: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 10,
   },
-  eyebrow: {
-    color: "#7A857F",
-    fontSize: 11,
+  deckHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 8,
+    flexShrink: 1,
+  },
+  deckTitle: {
+    color: INK,
+    fontSize: 15,
     fontWeight: "900",
-    letterSpacing: 1,
-    textTransform: "uppercase",
   },
-  title: {
-    color: "#17201A",
-    fontSize: 25,
-    fontWeight: "900",
-  },
-  activeTitle: {
+  deckCurrent: {
     color: GREEN_DARK,
     fontSize: 12,
     fontWeight: "900",
-    marginBottom: 4,
   },
-  segmentedNav: {
-    minHeight: 48,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E4ECE7",
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+  deckActionButton: {
+    minHeight: 34,
+    borderRadius: 17,
+    backgroundColor: GREEN,
+    paddingHorizontal: 10,
     flexDirection: "row",
-    gap: 6,
-  },
-  navButton: {
-    flex: 1,
-    minWidth: 0,
-    borderRadius: 16,
-    backgroundColor: "#F2F6F3",
-    height: 36,
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
     gap: 5,
-    paddingHorizontal: 6,
   },
-  navButtonActive: {
-    backgroundColor: GREEN,
-  },
-  navButtonText: {
-    flexShrink: 1,
-    color: "#68746D",
-    fontSize: 11.5,
+  deckActionText: {
+    color: "#FFFFFF",
+    fontSize: 12,
     fontWeight: "900",
   },
-  navButtonTextActive: {
-    color: "#FFFFFF",
+  sectionCards: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  sectionCard: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 104,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E3ECE7",
+    backgroundColor: "#FBFDFC",
+    padding: 10,
+  },
+  sectionCardActive: {
+    backgroundColor: "#EAF8EE",
+    borderColor: "#BFE8CC",
+    shadowColor: GREEN,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  sectionCardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 6,
+    marginBottom: 8,
+  },
+  sectionIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: "#EEF8F1",
+    borderWidth: 1,
+    borderColor: "#D6EBDD",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sectionIconActive: {
+    backgroundColor: GREEN,
+    borderColor: GREEN,
+  },
+  sectionLabel: {
+    color: INK,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  sectionLabelActive: {
+    color: GREEN_DARK,
+  },
+  sectionDescription: {
+    color: MUTED,
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 15,
+    marginTop: 3,
+  },
+  sectionDescriptionActive: {
+    color: "#315D42",
+  },
+  sectionCountPill: {
+    minWidth: 30,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#EEF3EF",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  sectionCountPillActive: {
+    backgroundColor: SURFACE,
+  },
+  sectionCountText: {
+    color: MUTED,
+    fontSize: 12.5,
+    fontWeight: "900",
+  },
+  sectionCountTextActive: {
+    color: GREEN_DARK,
   },
   content: {
     flex: 1,
@@ -596,6 +848,21 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: "#68746D",
     fontSize: 12.5,
+    fontWeight: "900",
+  },
+  appointmentDetailsHint: {
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#EEF3EF",
+    paddingTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 3,
+  },
+  appointmentDetailsHintText: {
+    color: GREEN_DARK,
+    fontSize: 12,
     fontWeight: "900",
   },
   emptyState: {

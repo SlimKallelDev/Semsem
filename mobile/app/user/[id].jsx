@@ -68,7 +68,7 @@ const formatMemberSince = (dateValue) => {
 };
 
 const formatLocation = (item) => {
-  return [item?.location?.governorate || item?.location?.city, item?.location?.country]
+  return [item?.location?.country, item?.location?.governorate || item?.location?.city]
     .filter(Boolean)
     .join(", ");
 };
@@ -157,7 +157,7 @@ export default function PublicUserProfileScreen() {
   const canRequestAppointment =
     !isOwnProfile && isServiceProviderProfileType(profile?.profileType);
   const location =
-    [profile?.governorate || profile?.city, profile?.country]
+    [profile?.country, profile?.governorate || profile?.city]
       .filter(Boolean)
       .join(", ") ||
     "Location not shared";

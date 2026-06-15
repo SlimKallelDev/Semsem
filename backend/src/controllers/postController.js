@@ -2,6 +2,7 @@ const Post = require("../models/Post");
 const User = require("../models/User");
 const { uploadPostImageBuffer } = require("../services/cloudinaryService");
 const {
+  POST_TYPES,
   getAllowedPostTypesForProfileType,
   isPostTypeAllowedForProfileType,
   isValidPostType,
@@ -10,7 +11,7 @@ const {
 const { USER_PUBLIC_FIELDS } = require("../constants/userPublicFields");
 
 const HTTP_URL_PATTERN = /^https?:\/\//i;
-const POST_IMAGE_MIN_CREATE = 1;
+const POST_IMAGE_MIN_CREATE = 0;
 const POST_IMAGE_MAX = 5;
 
 const escapeRegex = (value = "") =>
@@ -21,6 +22,61 @@ const normalizeLocation = (location = {}) => ({
   city: location?.governorate?.trim?.() || location?.city?.trim?.() || "",
   country: location?.country?.trim?.() || "",
 });
+
+const createRequestError = (message, statusCode = 400) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
+const parseSalePrice = (value) => {
+  if (value === undefined || value === null) return null;
+
+  const rawValue = String(value).trim();
+  if (!rawValue) return null;
+
+  const parsedPrice = Number(rawValue.replace(",", "."));
+  if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+    throw createRequestError("Enter a valid sale price");
+  }
+
+  return parsedPrice;
+};
+
+const normalizeCurrency = (value) => String(value || "").trim().toUpperCase();
+
+const resolveSaleDetails = ({
+  type,
+  price,
+  currency,
+  existingPrice = null,
+  existingCurrency = "",
+}) => {
+  if (type !== POST_TYPES.SALE) {
+    return {
+      price: null,
+      currency: "",
+    };
+  }
+
+  const resolvedPrice =
+    price === undefined ? parseSalePrice(existingPrice) : parseSalePrice(price);
+  const resolvedCurrency =
+    currency === undefined ? normalizeCurrency(existingCurrency) : normalizeCurrency(currency);
+
+  if (resolvedPrice === null) {
+    throw createRequestError("Sale price is required");
+  }
+
+  if (!resolvedCurrency) {
+    throw createRequestError("Sale currency is required");
+  }
+
+  return {
+    price: resolvedPrice,
+    currency: resolvedCurrency,
+  };
+};
 
 const normalizePostLocationDocument = (post) => {
   if (!post) return post;
@@ -251,7 +307,7 @@ const getAuthorProfileType = async (userId) => {
 
 const createPost = async (req, res, next) => {
   try {
-    const { type, title, description, pet_type, location } = req.body;
+    const { type, title, description, pet_type, location, price, currency } = req.body;
     const normalizedType = normalizePostType(type);
     const userId = req.user?.userId;
 
@@ -283,6 +339,12 @@ const createPost = async (req, res, next) => {
       });
     }
 
+    const saleDetails = resolveSaleDetails({
+      type: normalizedType,
+      price,
+      currency,
+    });
+
     if (images.length < POST_IMAGE_MIN_CREATE) {
       return res.status(400).json({
         message: `At least ${POST_IMAGE_MIN_CREATE} post image is required`,
@@ -301,6 +363,8 @@ const createPost = async (req, res, next) => {
       image: images[0] || "",
       images,
       pet_type: String(pet_type || "").trim(),
+      price: saleDetails.price,
+      currency: saleDetails.currency,
       location: normalizedLocation,
     };
 
@@ -378,7 +442,7 @@ const updatePost = async (req, res, next) => {
         .json({ message: "Not authorized to update this post" });
     }
 
-    const { type, title, description, pet_type, location } = req.body;
+    const { type, title, description, pet_type, location, price, currency } = req.body;
     const profileType = await getAuthorProfileType(req.user.userId);
 
     if (type !== undefined) {
@@ -416,6 +480,19 @@ const updatePost = async (req, res, next) => {
       post.image = images[0] || "";
     }
     if (pet_type !== undefined) post.pet_type = String(pet_type || "").trim();
+
+    if (type !== undefined || price !== undefined || currency !== undefined) {
+      const saleDetails = resolveSaleDetails({
+        type: normalizePostType(post.type),
+        price,
+        currency,
+        existingPrice: post.price,
+        existingCurrency: post.currency,
+      });
+
+      post.price = saleDetails.price;
+      post.currency = saleDetails.currency;
+    }
 
     if (location !== undefined) {
       const normalizedLocation = parseLocationInput(location);

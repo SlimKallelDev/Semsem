@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  BackHandler,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -8,7 +9,10 @@ import {
   Keyboard,
   ActivityIndicator,
   Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Link, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -25,6 +29,22 @@ export default function Login() {
   const [error, setError] = useState(null);
 
   const { login, loading } = useUser();
+
+  const handleBackToHome = () => {
+    router.replace("/home");
+  };
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        handleBackToHome();
+        return true;
+      }
+    );
+
+    return () => subscription.remove();
+  }, []);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password) {
@@ -44,6 +64,18 @@ export default function Login() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          activeOpacity={0.82}
+          onPress={handleBackToHome}
+        >
+          <Ionicons name="chevron-back" size={23} color="#19201B" />
+        </TouchableOpacity>
+        <Text style={styles.brandText}>Semsem</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <KeyboardAvoidingView
           style={styles.flex}
@@ -57,7 +89,7 @@ export default function Login() {
             showsVerticalScrollIndicator={false}
           >
             <ThemedView>
-              <Spacer height={60} />
+              <Spacer height={34} />
               <ThemedText type="title" style={styles.title}>
                 Welcome Back!
               </ThemedText>
@@ -135,6 +167,31 @@ export default function Login() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#F4F6F4" },
   flex: { flex: 1 },
+  header: {
+    minHeight: 52,
+    paddingHorizontal: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E8ECE9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  brandText: {
+    color: "#3DB85C",
+    fontSize: 26,
+    fontWeight: "800",
+  },
+  headerSpacer: {
+    width: 42,
+  },
   container: { flexGrow: 1, paddingHorizontal: 24 },
   title: { textAlign: "center", fontSize: 28 },
   subtitle: { textAlign: "center", marginTop: 8, opacity: 0.8 },

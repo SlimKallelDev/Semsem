@@ -102,6 +102,9 @@ const buildPetFormData = (payload = {}) => {
   if (payload.location !== undefined) {
     formData.append("location", JSON.stringify(normalizeLocation(payload.location)));
   }
+  if (payload.careRecord !== undefined) {
+    formData.append("careRecord", JSON.stringify(payload.careRecord || {}));
+  }
 
   const images = resolvePayloadImages(payload);
   images.forEach((imageUri) => {

@@ -46,7 +46,7 @@ function askForActivation() {
 
     Alert.alert(
       "Enable detect location",
-      "Activate detect location so Semsem can use your governorate and country for Near me filters.",
+      "Activate detect location so Semsem can use your country and city for Near me filters.",
       [
         {
           text: "Not now",
@@ -111,7 +111,7 @@ export function LocationFilterProvider({ children }) {
   const [locationBootstrapped, setLocationBootstrapped] = useState(false);
 
   const nearbySummary = useMemo(
-    () => [detectedGovernorate, detectedCountry].filter(Boolean).join(", "),
+    () => [detectedCountry, detectedGovernorate].filter(Boolean).join(", "),
     [detectedGovernorate, detectedCountry]
   );
 
@@ -449,9 +449,9 @@ export function LocationFilterProvider({ children }) {
 
     if (mode === "place") {
       return (
-        [selectedGovernorate.trim(), selectedCountry.trim()]
+        [selectedCountry.trim(), selectedGovernorate.trim()]
           .filter(Boolean)
-          .join(", ") || "Country / Governorate"
+          .join(", ") || "Country / City"
       );
     }
 
@@ -464,7 +464,7 @@ export function LocationFilterProvider({ children }) {
     }
 
     if (mode === "place") {
-      return "Filter by country or governorate";
+      return "Filter by country or city";
     }
 
     if (nearbySummary) {

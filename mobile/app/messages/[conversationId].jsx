@@ -17,6 +17,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import AppTopBar from "../../components/AppTopBar";
 import ThemedText from "../../components/ThemedText";
 import ThemedView from "../../components/ThemedView";
+import { formatUserTypeRatingWithCount } from "../../constants/userDisplay";
 import { connectSocket } from "../../services/socketService";
 import {
   getConversationById,
@@ -49,7 +50,7 @@ const getDisplayName = (person) => {
 
 export default function ChatScreen() {
   const { conversationId: rawConversationId } = useLocalSearchParams();
-  const { user } = useUser();
+  const { user, initializing } = useUser();
   const insets = useSafeAreaInsets();
   const conversationId = Array.isArray(rawConversationId)
     ? rawConversationId[0]
@@ -72,7 +73,7 @@ export default function ChatScreen() {
   const currentUserName = useMemo(() => getDisplayName(user), [user]);
 
   useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId || !currentUserId) return;
 
     const loadMessages = async () => {
       try {
@@ -90,7 +91,13 @@ export default function ChatScreen() {
     };
 
     loadMessages();
-  }, [conversationId]);
+  }, [conversationId, currentUserId]);
+
+  useEffect(() => {
+    if (!initializing && !currentUserId) {
+      router.replace("/(auth)/login");
+    }
+  }, [currentUserId, initializing]);
 
   useEffect(() => {
     if (!conversationId || !currentUserId) return;
@@ -371,6 +378,7 @@ export default function ChatScreen() {
 
   const participantId = getEntityId(participant);
   const participantName = getDisplayName(participant);
+  const participantMeta = formatUserTypeRatingWithCount(participant);
   const participantAvatar = participant?.avatar || participant?.image || PLACEHOLDER_AVATAR;
   const typingIndicatorText = useMemo(() => {
     const activeTypers = Object.values(typingUsers);
@@ -409,6 +417,8 @@ export default function ChatScreen() {
     );
   };
 
+  if (!currentUserId) return null;
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
@@ -422,7 +432,7 @@ export default function ChatScreen() {
                   {participantName}
                 </ThemedText>
                 <ThemedText style={styles.chatHeaderHint} numberOfLines={1}>
-                  Voir le profil
+                  {participantMeta}
                 </ThemedText>
               </View>
             </View>
@@ -449,7 +459,7 @@ export default function ChatScreen() {
                 {participantName}
               </ThemedText>
               <ThemedText style={styles.chatHeaderHint} numberOfLines={1}>
-                Voir le profil
+                {participantMeta}
               </ThemedText>
             </View>
             <Ionicons name="chevron-forward" size={16} color="#95A09A" />

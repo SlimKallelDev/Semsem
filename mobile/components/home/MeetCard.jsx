@@ -57,7 +57,7 @@ function formatLocation(pet) {
     "";
   const country = pet?.location?.country || pet?.owner?.country || "";
 
-  return [governorate, country].filter(Boolean).join(", ");
+  return [country, governorate].filter(Boolean).join(", ");
 }
 
 function titleCase(value) {

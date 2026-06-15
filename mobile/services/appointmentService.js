@@ -4,6 +4,10 @@ export const getAppointments = async () => {
   return request("/appointments");
 };
 
+export const getAppointmentById = async (appointmentId) => {
+  return request(`/appointments/${appointmentId}`);
+};
+
 export const createAppointment = async (payload = {}) => {
   return request("/appointments", {
     method: "POST",
@@ -18,8 +22,17 @@ export const updateAppointmentStatus = async (appointmentId, status) => {
   });
 };
 
+export const updateAppointmentDate = async (appointmentId, requestedFor) => {
+  return request(`/appointments/${appointmentId}/date`, {
+    method: "PATCH",
+    body: JSON.stringify({ requestedFor }),
+  });
+};
+
 export default {
   getAppointments,
+  getAppointmentById,
   createAppointment,
+  updateAppointmentDate,
   updateAppointmentStatus,
 };

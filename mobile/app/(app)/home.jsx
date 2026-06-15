@@ -49,11 +49,12 @@ const TABS = [
 ];
 const FEED_FILTERS = [
   { value: "All", label: "All", iconFamily: "ion", icon: "grid-outline" },
-  { value: "Adoption", label: "Adoption", iconFamily: "ion", icon: "home-outline" },
-  { value: "Lost", label: "Lost", iconFamily: "ion", icon: "alert-circle-outline" },
-  { value: "Found", label: "Found", iconFamily: "ion", icon: "search-outline" },
-  { value: "Mating", label: "Mating", iconFamily: "ion", icon: "heart-outline" },
-  { value: "General", label: "General", iconFamily: "ion", icon: "newspaper-outline" },
+  { value: "general", label: "Question", iconFamily: "ion", icon: "help-circle-outline" },
+  { value: "adoption", label: "Adoption", iconFamily: "ion", icon: "home-outline" },
+  { value: "lost", label: "Lost", iconFamily: "ion", icon: "alert-circle-outline" },
+  { value: "found", label: "Found", iconFamily: "ion", icon: "search-outline" },
+  { value: "mating", label: "Mating", iconFamily: "ion", icon: "heart-outline" },
+  { value: "sale", label: "Sale", iconFamily: "ion", icon: "pricetag-outline" },
 ];
 const PET_FILTERS = [
   { value: "all", label: "All", iconFamily: "ion", icon: "paw-outline" },

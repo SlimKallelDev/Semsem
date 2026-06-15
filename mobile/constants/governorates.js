@@ -24,6 +24,7 @@ const COUNTRY_ALIASES = {
 };
 
 export const GOVERNORATES_BY_COUNTRY = {
+  France: ["Paris"],
   Tunisia: [
     "Ariana",
     "Beja",

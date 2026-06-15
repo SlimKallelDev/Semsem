@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -120,8 +120,8 @@ function PetRow({ item, onDelete }) {
   );
 }
 
-export default function MyPetsScreen() {
-  const { user } = useUser();
+export default function MyPetsScreen({ embedded = false, onCountChange } = {}) {
+  const { user, initializing } = useUser();
 
   const userId = useMemo(
     () => user?._id || user?.id || user?.$id || null,
@@ -135,26 +135,35 @@ export default function MyPetsScreen() {
   const loadMyPets = useCallback(async () => {
     if (!userId) {
       setPets([]);
+      onCountChange?.(0);
       setLoading(false);
       setRefreshing(false);
       return;
     }
     try {
       const data = await getPetsByOwner(userId);
-      setPets(Array.isArray(data) ? data : []);
+      const nextPets = Array.isArray(data) ? data : [];
+      setPets(nextPets);
+      onCountChange?.(nextPets.length);
     } catch (error) {
       console.error("Error loading my pets:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [userId]);
+  }, [onCountChange, userId]);
 
   useFocusEffect(
     useCallback(() => {
       loadMyPets();
     }, [loadMyPets])
   );
+
+  useEffect(() => {
+    if (!embedded && !initializing && !userId) {
+      router.replace("/(auth)/login");
+    }
+  }, [embedded, initializing, userId]);
 
   const handleDelete = (petId) => {
     Alert.alert("Delete Pet", "Are you sure you want to delete this pet?", [
@@ -165,7 +174,11 @@ export default function MyPetsScreen() {
         onPress: async () => {
           try {
             await deletePet(petId);
-            setPets((prev) => prev.filter((p) => (p._id || p.id) !== petId));
+            setPets((prev) => {
+              const nextPets = prev.filter((p) => (p._id || p.id) !== petId);
+              onCountChange?.(nextPets.length);
+              return nextPets;
+            });
           } catch {
             Alert.alert("Error", "Failed to delete pet");
           }
@@ -176,7 +189,10 @@ export default function MyPetsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={[]}>
+      <SafeAreaView
+        style={[styles.safe, embedded && styles.embeddedSafe]}
+        edges={[]}
+      >
         <View style={styles.center}>
           <ActivityIndicator size="large" color={GREEN} />
         </View>
@@ -184,25 +200,23 @@ export default function MyPetsScreen() {
     );
   }
 
-  if (!userId) {
-    return (
-      <SafeAreaView style={styles.safe} edges={[]}>
-        <View style={styles.center}>
-          <ThemedText>You need to be logged in to see your pets.</ThemedText>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  if (!userId) return null;
 
   return (
-    <SafeAreaView style={styles.safe} edges={[]}>
+    <SafeAreaView
+      style={[styles.safe, embedded && styles.embeddedSafe]}
+      edges={[]}
+    >
       <FlatList
         data={pets}
         keyExtractor={(item, i) => item?._id || item?.id || String(i)}
         renderItem={({ item }) => (
           <PetRow item={item} onDelete={handleDelete} />
         )}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          embedded && styles.embeddedListContent,
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -211,7 +225,7 @@ export default function MyPetsScreen() {
             tintColor={GREEN}
           />
         }
-        ListHeaderComponent={
+        ListHeaderComponent={!embedded ? (
           <View style={styles.pageHeader}>
             <View>
               <ThemedText style={styles.pageTitle}>My Pets</ThemedText>
@@ -224,7 +238,7 @@ export default function MyPetsScreen() {
               <Ionicons name="add" size={26} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
-        }
+        ) : null}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="paw-outline" size={40} color={GREEN} />
@@ -244,6 +258,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F4F6F4",
   },
+  embeddedSafe: {
+    backgroundColor: "transparent",
+  },
   center: {
     flex: 1,
     alignItems: "center",
@@ -252,6 +269,9 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 40,
+  },
+  embeddedListContent: {
+    paddingTop: 12,
   },
   pageHeader: {
     flexDirection: "row",

@@ -12,6 +12,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useLocationFilter } from "../../contexts/LocationFilterContext";
+import { normalizePostType } from "../../constants/postTypes";
 import { getPosts } from "../../services/postService";
 import ThemedText from "../ThemedText";
 import PostCard from "./PostCard";
@@ -57,7 +58,7 @@ export default function PostsFeed({ selectedFilter = "All" }) {
       ? posts
       : posts.filter(
           (post) =>
-            (post.type || "").toLowerCase() === selectedFilter.toLowerCase()
+            normalizePostType(post.type) === normalizePostType(selectedFilter)
         );
   const isInitialLoading = loading && filteredPosts.length === 0;
 

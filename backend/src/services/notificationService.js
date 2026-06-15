@@ -19,7 +19,7 @@ const notificationPopulate = [
   },
   {
     path: "data.appointment",
-    select: "_id requester provider status requestedFor pets otherPet createdAt",
+    select: "_id requester provider status requestedFor pets otherPet history createdAt updatedAt",
   },
 ];
 

@@ -12,11 +12,21 @@ export const PROFILE_TYPES = [
 
 export const DEFAULT_PROFILE_TYPE = "pet_owner";
 
+const PROFILE_TYPE_ALIASES = {
+  vet: "veterinarian",
+  veterinary: "veterinarian",
+  veterinaire: "veterinarian",
+};
+
 export const normalizeProfileType = (value) => {
-  return String(value || "")
+  const normalized = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toLowerCase()
     .replace(/\s+/g, "_");
+
+  return PROFILE_TYPE_ALIASES[normalized] || normalized;
 };
 
 export const getProfileTypeLabel = (value) => {

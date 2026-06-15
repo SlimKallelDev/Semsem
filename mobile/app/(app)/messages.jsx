@@ -14,11 +14,32 @@ import { router } from "expo-router";
 import ThemedText from "../../components/ThemedText";
 import ThemedView from "../../components/ThemedView";
 import Spacer from "../../components/Spacer";
+import { formatUserTypeRatingWithCount } from "../../constants/userDisplay";
 import { useUser } from "../../contexts/UserContext";
 import { getUserConversations } from "../../services/messageService";
 
+const getEntityId = (value) => {
+  if (!value) return null;
+  if (typeof value === "string" || typeof value === "number") return value;
+  return value?._id || value?.id || value?.userId || value?.$id || null;
+};
+
+const getDisplayName = (person) => {
+  const explicit = String(
+    person?.name || person?.fullName || person?.username || ""
+  ).trim();
+
+  if (explicit) return explicit;
+
+  const first = String(person?.firstName || "").trim();
+  const last = String(person?.lastName || "").trim();
+  const fullName = [first, last].filter(Boolean).join(" ");
+
+  return fullName || String(person?.email || "Conversation").trim();
+};
+
 export default function MessagesScreen() {
-  const { user } = useUser();
+  const { user, initializing } = useUser();
 
   const userId = useMemo(
     () => user?._id || user?.id || user?.$id || null,
@@ -52,6 +73,12 @@ export default function MessagesScreen() {
     loadConversations();
   }, [loadConversations]);
 
+  useEffect(() => {
+    if (!initializing && !userId) {
+      router.replace("/(auth)/login");
+    }
+  }, [initializing, userId]);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadConversations();
@@ -59,7 +86,7 @@ export default function MessagesScreen() {
 
   const renderConversation = ({ item }) => {
     const otherUser = item?.participants?.find(
-      (participant) => String(participant?._id) !== String(userId)
+      (participant) => String(getEntityId(participant)) !== String(userId)
     );
 
     const avatarUri =
@@ -67,7 +94,8 @@ export default function MessagesScreen() {
       otherUser?.image ||
       "https://via.placeholder.com/100x100.png?text=User";
 
-    const title = otherUser?.name || "Conversation";
+    const title = getDisplayName(otherUser);
+    const profileMeta = formatUserTypeRatingWithCount(otherUser);
     const subtitle = item?.lastMessage?.text || "Start conversation";
 
     return (
@@ -79,7 +107,12 @@ export default function MessagesScreen() {
         <Image source={{ uri: avatarUri }} style={styles.avatar} />
 
         <View style={styles.textContainer}>
-          <ThemedText style={styles.name}>{title}</ThemedText>
+          <ThemedText style={styles.name} numberOfLines={1}>
+            {title}
+          </ThemedText>
+          <ThemedText style={styles.profileMeta} numberOfLines={1}>
+            {profileMeta}
+          </ThemedText>
           <ThemedText style={styles.lastMessage} numberOfLines={1}>
             {subtitle}
           </ThemedText>
@@ -98,15 +131,7 @@ export default function MessagesScreen() {
     );
   }
 
-  if (!userId) {
-    return (
-      <SafeAreaView style={styles.safeArea} edges={[]}>
-        <ThemedView style={styles.center}>
-          <ThemedText>You need to be logged in to see messages.</ThemedText>
-        </ThemedView>
-      </SafeAreaView>
-    );
-  }
+  if (!userId) return null;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>
@@ -222,6 +247,12 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: "700",
+  },
+  profileMeta: {
+    marginTop: 2,
+    color: "#2D7F43",
+    fontSize: 12.5,
+    fontWeight: "800",
   },
   lastMessage: {
     marginTop: 4,

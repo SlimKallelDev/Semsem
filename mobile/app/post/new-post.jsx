@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  FlatList,
   Image,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
+  StatusBar,
   TextInput,
   TouchableOpacity,
   View,
@@ -18,10 +17,11 @@ import { router } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AppTopBar from "../../components/AppTopBar";
-import GovernorateSelector from "../../components/location/GovernorateSelector";
+import CurrencySelector from "../../components/CurrencySelector";
+import LocationSelector from "../../components/location/LocationSelector";
 import ThemedText from "../../components/ThemedText";
 import ThemedView from "../../components/ThemedView";
-import { COUNTRIES } from "../../constants/countries";
+import { DEFAULT_CURRENCY } from "../../constants/currencies";
 import {
   resolveCountryName,
   resolveGovernorateForCountry,
@@ -33,23 +33,47 @@ import {
   isPostTypeAllowedForProfileType,
 } from "../../constants/postTypes";
 import { useUser } from "../../contexts/UserContext";
+import { getPetsByOwner } from "../../services/petService";
 import { createPost } from "../../services/postService";
 
-const MIN_IMAGES = 1;
 const MAX_IMAGES = 5;
+const PET_TYPE_OPTIONS = ["Dog", "Cat", "Bird", "Rabbit", "Other"];
+
+const getEntityId = (value) => {
+  if (!value) return null;
+  if (typeof value === "string" || typeof value === "number") return value;
+  return value?._id || value?.id || value?.$id || null;
+};
+
+const titleCase = (value) => {
+  const text = String(value || "").trim();
+
+  if (!text) return "";
+
+  return text
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+};
 
 export default function NewPostScreen() {
-  const { user } = useUser();
+  const { user, initializing } = useUser();
   const insets = useSafeAreaInsets();
   const [title, setTitle] = useState("");
   const [type, setType] = useState(POST_TYPES.GENERAL);
+  const [typeSelectOpen, setTypeSelectOpen] = useState(false);
   const [description, setDescription] = useState("");
-  const [petType, setPetType] = useState("");
+  const [price, setPrice] = useState("");
+  const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
+  const [ownedPets, setOwnedPets] = useState([]);
+  const [petsLoading, setPetsLoading] = useState(false);
+  const [selectedPetIds, setSelectedPetIds] = useState([]);
+  const [includeOtherPet, setIncludeOtherPet] = useState(false);
+  const [otherPetType, setOtherPetType] = useState("");
+  const [customOtherPetType, setCustomOtherPetType] = useState("");
   const [images, setImages] = useState([]);
   const [governorate, setGovernorate] = useState("");
   const [country, setCountry] = useState("");
-  const [countryModalVisible, setCountryModalVisible] = useState(false);
-  const [countrySearch, setCountrySearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const allowedPostTypes = useMemo(
     () => getAllowedPostTypesForProfileType(user?.profileType),
@@ -59,6 +83,36 @@ export default function NewPostScreen() {
     () => POST_TYPE_OPTIONS.filter((item) => allowedPostTypes.includes(item.value)),
     [allowedPostTypes]
   );
+  const selectedPostTypeOption = useMemo(
+    () => postTypeOptions.find((item) => item.value === type) || postTypeOptions[0],
+    [postTypeOptions, type]
+  );
+  const isSalePost = type === POST_TYPES.SALE;
+  const userId = useMemo(() => getEntityId(user), [user]);
+  const selectedPets = useMemo(() => {
+    const selected = new Set(selectedPetIds.map((id) => String(id)));
+    return ownedPets.filter((pet) => selected.has(String(getEntityId(pet))));
+  }, [ownedPets, selectedPetIds]);
+  const derivedPetType = useMemo(() => {
+    const typeParts = selectedPets
+      .map((pet) => titleCase(pet?.type))
+      .filter(Boolean);
+    const otherType = titleCase(
+      otherPetType === "Other" ? customOtherPetType : otherPetType
+    );
+
+    if (includeOtherPet && otherType) {
+      typeParts.push(otherType);
+    }
+
+    return [...new Set(typeParts)].join(", ");
+  }, [customOtherPetType, includeOtherPet, otherPetType, selectedPets]);
+
+  useEffect(() => {
+    if (!initializing && !userId) {
+      router.replace("/(auth)/login");
+    }
+  }, [initializing, userId]);
 
   useEffect(() => {
     const fallbackType = allowedPostTypes[0] || POST_TYPES.GENERAL;
@@ -68,25 +122,76 @@ export default function NewPostScreen() {
     }
   }, [allowedPostTypes, type]);
 
-  const filteredCountries = useMemo(() => {
-    if (!countrySearch.trim()) return COUNTRIES;
+  useEffect(() => {
+    let mounted = true;
 
-    return COUNTRIES.filter((item) =>
-      item.toLowerCase().includes(countrySearch.trim().toLowerCase())
+    const loadOwnedPets = async () => {
+      if (!userId) {
+        setOwnedPets([]);
+        setSelectedPetIds([]);
+        return;
+      }
+
+      try {
+        setPetsLoading(true);
+        const data = await getPetsByOwner(userId);
+        const pets = Array.isArray(data) ? data : [];
+
+        if (!mounted) return;
+
+        setOwnedPets(pets);
+        setSelectedPetIds((current) => {
+          const validIds = new Set(
+            pets.map((pet) => String(getEntityId(pet))).filter(Boolean)
+          );
+
+          return current.filter((id) => validIds.has(String(id)));
+        });
+      } catch (error) {
+        console.log("Load post pets error:", error?.message || error);
+        if (mounted) setOwnedPets([]);
+      } finally {
+        if (mounted) setPetsLoading(false);
+      }
+    };
+
+    loadOwnedPets();
+
+    return () => {
+      mounted = false;
+    };
+  }, [userId]);
+
+  const toggleSelectedPet = (petId) => {
+    const normalizedId = String(petId || "");
+    if (!normalizedId) return;
+
+    setSelectedPetIds((current) =>
+      current.some((id) => String(id) === normalizedId)
+        ? current.filter((id) => String(id) !== normalizedId)
+        : [...current, normalizedId]
     );
-  }, [countrySearch]);
+  };
 
-  const handleCountrySelect = (item) => {
-    const nextCountry = resolveCountryName(item);
+  const toggleOtherPet = () => {
+    setIncludeOtherPet((current) => {
+      const next = !current;
+      if (!next) {
+        setOtherPetType("");
+        setCustomOtherPetType("");
+      }
+      return next;
+    });
+  };
 
-    setCountry(nextCountry);
-    setGovernorate((current) =>
-      resolveGovernorateForCountry(nextCountry, current, {
-        fallbackToRaw: false,
-      })
-    );
-    setCountryModalVisible(false);
-    setCountrySearch("");
+  const handleTypeSelect = (nextType) => {
+    setType(nextType);
+    setTypeSelectOpen(false);
+
+    if (nextType !== POST_TYPES.SALE) {
+      setPrice("");
+      setCurrency(DEFAULT_CURRENCY);
+    }
   };
 
   const addAssetsAsImages = (assets = []) => {
@@ -117,7 +222,7 @@ export default function NewPostScreen() {
       if (!permission.granted) {
         Alert.alert(
           "Permission needed",
-          "Gallery permission is required to choose an image."
+          "Gallery permission is required to choose images."
         );
         return;
       }
@@ -178,6 +283,11 @@ export default function NewPostScreen() {
   };
 
   const handleSubmit = async () => {
+    if (!userId) {
+      router.replace("/(auth)/login");
+      return;
+    }
+
     if (!title.trim()) {
       Alert.alert("Validation Error", "Title is required");
       return;
@@ -194,8 +304,8 @@ export default function NewPostScreen() {
       governorate
     );
 
-    if (!normalizedCountry.trim()) {
-      Alert.alert("Validation Error", "Country is required");
+    if (!normalizedCountry.trim() || !normalizedGovernorate.trim()) {
+      Alert.alert("Validation Error", "Country / city is required");
       return;
     }
 
@@ -207,11 +317,43 @@ export default function NewPostScreen() {
       return;
     }
 
-    if (images.length < MIN_IMAGES || images.length > MAX_IMAGES) {
+    const normalizedSalePrice = price.trim().replace(",", ".");
+    const normalizedSaleCurrency = currency.trim().toUpperCase();
+
+    if (isSalePost) {
+      const salePriceNumber = Number(normalizedSalePrice);
+
+      if (!normalizedSalePrice || !Number.isFinite(salePriceNumber) || salePriceNumber <= 0) {
+        Alert.alert("Validation Error", "Enter a valid sale price.");
+        return;
+      }
+
+      if (!normalizedSaleCurrency) {
+        Alert.alert("Validation Error", "Enter the sale currency.");
+        return;
+      }
+    }
+
+    if (selectedPets.length === 0 && !includeOtherPet) {
       Alert.alert(
         "Validation Error",
-        `Please add between ${MIN_IMAGES} and ${MAX_IMAGES} images.`
+        "Select at least one pet, or choose Other and select the animal type."
       );
+      return;
+    }
+
+    if (includeOtherPet && !otherPetType.trim()) {
+      Alert.alert("Validation Error", "Select or enter the other animal type.");
+      return;
+    }
+
+    if (includeOtherPet && otherPetType === "Other" && !customOtherPetType.trim()) {
+      Alert.alert("Validation Error", "Enter the other animal type.");
+      return;
+    }
+
+    if (images.length > MAX_IMAGES) {
+      Alert.alert("Validation Error", `Please add up to ${MAX_IMAGES} images.`);
       return;
     }
 
@@ -223,7 +365,13 @@ export default function NewPostScreen() {
         type,
         description: description.trim(),
         images,
-        pet_type: petType.trim(),
+        pet_type: derivedPetType,
+        ...(isSalePost
+          ? {
+              price: normalizedSalePrice,
+              currency: normalizedSaleCurrency,
+            }
+          : {}),
         location: {
           governorate: normalizedGovernorate.trim(),
           country: normalizedCountry.trim(),
@@ -240,8 +388,11 @@ export default function NewPostScreen() {
     }
   };
 
+  if (!userId) return null;
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <ThemedView style={styles.container}>
         <AppTopBar title="Create New Post" />
 
@@ -272,21 +423,78 @@ export default function NewPostScreen() {
             />
 
             <ThemedText style={styles.label}>Type</ThemedText>
-            {postTypeOptions.map((item) => {
-              const active = item.value === type;
+            <View style={styles.typeSelectWrap}>
+              <TouchableOpacity
+                style={styles.typeSelectButton}
+                activeOpacity={0.86}
+                onPress={() => setTypeSelectOpen((value) => !value)}
+              >
+                <ThemedText style={styles.typeSelectText} numberOfLines={1}>
+                  {selectedPostTypeOption?.label || "Select post type"}
+                </ThemedText>
+                <Ionicons
+                  name={typeSelectOpen ? "chevron-up" : "chevron-down"}
+                  size={18}
+                  color="#6D7A72"
+                />
+              </TouchableOpacity>
 
-              return (
-                <TouchableOpacity
-                  key={item.value}
-                  style={[styles.typeButton, active && styles.activeTypeButton]}
-                  onPress={() => setType(item.value)}
-                >
-                  <ThemedText style={active ? styles.activeTypeText : null}>
-                    {item.label}
-                  </ThemedText>
-                </TouchableOpacity>
-              );
-            })}
+              {typeSelectOpen ? (
+                <View style={styles.typeOptionsList}>
+                  {postTypeOptions.map((item) => {
+                    const active = item.value === type;
+
+                    return (
+                      <TouchableOpacity
+                        key={item.value}
+                        style={[
+                          styles.typeOptionRow,
+                          active && styles.typeOptionRowActive,
+                        ]}
+                        activeOpacity={0.84}
+                        onPress={() => handleTypeSelect(item.value)}
+                      >
+                        <ThemedText
+                          style={[
+                            styles.typeOptionText,
+                            active && styles.typeOptionTextActive,
+                          ]}
+                        >
+                          {item.label}
+                        </ThemedText>
+                        {active ? (
+                          <Ionicons name="checkmark" size={18} color="#3DB85C" />
+                        ) : null}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+
+            {isSalePost ? (
+              <View style={styles.saleFieldsRow}>
+                <View style={styles.salePriceField}>
+                  <ThemedText style={styles.label}>Price</ThemedText>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="30"
+                    value={price}
+                    onChangeText={setPrice}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+
+                <View style={styles.saleCurrencyField}>
+                  <ThemedText style={styles.label}>Currency</ThemedText>
+                  <CurrencySelector
+                    value={currency}
+                    onChange={setCurrency}
+                    buttonStyle={styles.currencySelectButton}
+                  />
+                </View>
+              </View>
+            ) : null}
 
             <ThemedText style={styles.label}>Description</ThemedText>
             <TextInput
@@ -297,15 +505,158 @@ export default function NewPostScreen() {
               multiline
             />
 
-            <ThemedText style={styles.label}>Pet Type</ThemedText>
-            <TextInput
-              style={styles.input}
-              placeholder="dog, cat..."
-              value={petType}
-              onChangeText={setPetType}
-            />
+            <ThemedText style={styles.label}>Pets or animal type</ThemedText>
+            <ThemedText style={styles.helperText}>
+              Select one or more of your pets, or choose Other for a different animal.
+            </ThemedText>
 
-            <ThemedText style={styles.label}>Post Images (1 to 5)</ThemedText>
+            <View style={styles.petPickerPanel}>
+              {petsLoading ? (
+                <View style={styles.petPickerMessage}>
+                  <ThemedText style={styles.helperText}>Loading your pets...</ThemedText>
+                </View>
+              ) : null}
+
+              {!petsLoading && ownedPets.length === 0 ? (
+                <View style={styles.petPickerMessage}>
+                  <Ionicons name="paw-outline" size={18} color="#6F7C74" />
+                  <ThemedText style={styles.helperText}>
+                    No saved pets yet. Use Other below.
+                  </ThemedText>
+                </View>
+              ) : null}
+
+              {ownedPets.length > 0 ? (
+                <View style={styles.petOptionsWrap}>
+                  {ownedPets.map((pet) => {
+                    const petId = getEntityId(pet);
+                    const active = selectedPetIds.some(
+                      (id) => String(id) === String(petId)
+                    );
+                    const imageUri = pet?.image || pet?.images?.[0] || "";
+
+                    return (
+                      <TouchableOpacity
+                        key={String(petId)}
+                        style={[styles.petOption, active && styles.petOptionActive]}
+                        activeOpacity={0.86}
+                        onPress={() => toggleSelectedPet(petId)}
+                      >
+                        {imageUri ? (
+                          <Image source={{ uri: imageUri }} style={styles.petOptionImage} />
+                        ) : (
+                          <View style={styles.petOptionFallback}>
+                            <Ionicons name="paw" size={16} color="#3DB85C" />
+                          </View>
+                        )}
+
+                        <View style={styles.petOptionTextWrap}>
+                          <ThemedText
+                            style={[
+                              styles.petOptionName,
+                              active && styles.petOptionNameActive,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {pet?.name || "Unnamed"}
+                          </ThemedText>
+                          <ThemedText style={styles.petOptionType} numberOfLines={1}>
+                            {titleCase(pet?.type) || "Pet"}
+                          </ThemedText>
+                        </View>
+
+                        <Ionicons
+                          name={active ? "checkmark-circle" : "ellipse-outline"}
+                          size={20}
+                          color={active ? "#3DB85C" : "#B6C1BB"}
+                        />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : null}
+
+              <TouchableOpacity
+                style={[
+                  styles.otherPetOption,
+                  includeOtherPet && styles.otherPetOptionActive,
+                ]}
+                activeOpacity={0.86}
+                onPress={toggleOtherPet}
+              >
+                <View
+                  style={[
+                    styles.otherPetIcon,
+                    includeOtherPet && styles.otherPetIconActive,
+                  ]}
+                >
+                  <Ionicons
+                    name={includeOtherPet ? "checkmark" : "add"}
+                    size={17}
+                    color={includeOtherPet ? "#FFFFFF" : "#3DB85C"}
+                  />
+                </View>
+                <View style={styles.petOptionTextWrap}>
+                  <ThemedText
+                    style={[
+                      styles.petOptionName,
+                      includeOtherPet && styles.petOptionNameActive,
+                    ]}
+                  >
+                    Other
+                  </ThemedText>
+                  <ThemedText style={styles.petOptionType}>
+                    Select an animal type manually
+                  </ThemedText>
+                </View>
+              </TouchableOpacity>
+
+              {includeOtherPet ? (
+                <View style={styles.otherTypeBlock}>
+                  <View style={styles.petTypeChips}>
+                    {PET_TYPE_OPTIONS.map((item) => {
+                      const active = otherPetType === item;
+
+                      return (
+                        <TouchableOpacity
+                          key={item}
+                          style={[
+                            styles.petTypeChip,
+                            active && styles.petTypeChipActive,
+                          ]}
+                          activeOpacity={0.84}
+                          onPress={() => setOtherPetType(item)}
+                        >
+                          <ThemedText
+                            style={[
+                              styles.petTypeChipText,
+                              active && styles.petTypeChipTextActive,
+                            ]}
+                          >
+                            {item}
+                          </ThemedText>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {otherPetType === "Other" ? (
+                    <TextInput
+                      style={[styles.input, styles.inlineInput]}
+                      placeholder="Enter animal type"
+                      value={customOtherPetType}
+                      onChangeText={setCustomOtherPetType}
+                    />
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+
+            <ThemedText style={styles.petTypeSummary}>
+              Animal type: {derivedPetType || "Choose pets or Other"}
+            </ThemedText>
+
+            <ThemedText style={styles.label}>Images (optional, up to 5)</ThemedText>
             <ThemedText style={styles.imageCountText}>
               {images.length}/{MAX_IMAGES} selected
             </ThemedText>
@@ -352,25 +703,16 @@ export default function NewPostScreen() {
 
             <ThemedText style={styles.sectionTitle}>Location</ThemedText>
 
-            <ThemedText style={styles.label}>Country *</ThemedText>
-            <TouchableOpacity
-              style={styles.selectInput}
-              onPress={() => setCountryModalVisible(true)}
-            >
-              <ThemedText
-                style={country ? styles.selectText : styles.placeholderText}
-              >
-                {country || "Select a country"}
-              </ThemedText>
-            </TouchableOpacity>
-
-            <ThemedText style={styles.label}>Governorate</ThemedText>
-            <GovernorateSelector
+            <ThemedText style={styles.label}>Country / City *</ThemedText>
+            <LocationSelector
               country={country}
-              value={governorate}
-              onChange={setGovernorate}
-              placeholder="Tunis"
-              inputStyle={styles.input}
+              governorate={governorate}
+              onChange={(location) => {
+                setCountry(location.country);
+                setGovernorate(location.governorate);
+              }}
+              placeholder="Country / City"
+              buttonStyle={styles.input}
             />
 
             <TouchableOpacity
@@ -385,49 +727,6 @@ export default function NewPostScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
 
-        <Modal
-          visible={countryModalVisible}
-          animationType="slide"
-          onRequestClose={() => setCountryModalVisible(false)}
-        >
-          <SafeAreaView style={styles.modalSafeArea} edges={["top", "bottom"]}>
-            <KeyboardAvoidingView
-              style={styles.modalKeyboard}
-              behavior={Platform.OS === "ios" ? "padding" : "height"}
-              keyboardVerticalOffset={0}
-            >
-              <ThemedView style={styles.modalContainer}>
-                <View style={styles.modalHeader}>
-                  <ThemedText type="title">Select Country</ThemedText>
-                  <TouchableOpacity onPress={() => setCountryModalVisible(false)}>
-                    <ThemedText style={styles.closeText}>Close</ThemedText>
-                  </TouchableOpacity>
-                </View>
-
-                <TextInput
-                  style={styles.input}
-                  placeholder="Search country"
-                  value={countrySearch}
-                  onChangeText={setCountrySearch}
-                />
-
-                <FlatList
-                  data={filteredCountries}
-                  keyExtractor={(item) => item}
-                  keyboardShouldPersistTaps="handled"
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.countryItem}
-                      onPress={() => handleCountrySelect(item)}
-                    >
-                      <ThemedText>{item}</ThemedText>
-                    </TouchableOpacity>
-                  )}
-                />
-              </ThemedView>
-            </KeyboardAvoidingView>
-          </SafeAreaView>
-        </Modal>
       </ThemedView>
     </SafeAreaView>
   );
@@ -436,10 +735,11 @@ export default function NewPostScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F4F6F4",
+    backgroundColor: "#FFFFFF",
   },
   container: {
     flex: 1,
+    backgroundColor: "#F4F6F4",
   },
   flex: {
     flex: 1,
@@ -470,42 +770,218 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: "#fff",
   },
-  selectInput: {
+  typeSelectWrap: {
+    marginBottom: 4,
+  },
+  typeSelectButton: {
+    minHeight: 48,
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: "#DCE3DE",
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 14,
+    paddingVertical: 12,
     backgroundColor: "#fff",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
-  selectText: {
-    color: "#000",
+  typeSelectText: {
+    flex: 1,
+    marginRight: 8,
+    color: "#17201A",
+    fontSize: 15,
+    fontWeight: "700",
   },
-  placeholderText: {
-    color: "#888",
+  typeOptionsList: {
+    borderWidth: 1,
+    borderColor: "#DDE8E1",
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    marginTop: 6,
+    overflow: "hidden",
+  },
+  typeOptionRow: {
+    minHeight: 46,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF3EF",
+  },
+  typeOptionRowActive: {
+    backgroundColor: "#F0FBF3",
+  },
+  typeOptionText: {
+    color: "#38443D",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  typeOptionTextActive: {
+    color: "#227B3E",
+    fontWeight: "900",
+  },
+  saleFieldsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  salePriceField: {
+    flex: 1,
+    minWidth: 0,
+  },
+  saleCurrencyField: {
+    width: 150,
+  },
+  currencySelectButton: {
+    borderColor: "#ddd",
   },
   textArea: {
     minHeight: 110,
     textAlignVertical: "top",
   },
-  typeButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    backgroundColor: "#eee",
+  helperText: {
+    color: "#6F7C74",
+    fontSize: 12.5,
+    fontWeight: "600",
+    lineHeight: 18,
     marginBottom: 8,
   },
-  activeTypeButton: {
-    backgroundColor: "#4CAF50",
+  petPickerPanel: {
+    borderWidth: 1,
+    borderColor: "#DDE8E1",
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    padding: 10,
+    marginBottom: 8,
   },
-  activeTypeText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  imageButtonsRow: {
+  petPickerMessage: {
+    minHeight: 44,
+    borderRadius: 12,
+    backgroundColor: "#F6FAF7",
+    paddingHorizontal: 10,
     flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  petOptionsWrap: {
+    gap: 8,
+    marginBottom: 8,
+  },
+  petOption: {
+    minHeight: 58,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E0E8E3",
+    backgroundColor: "#FBFDFC",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
-    marginBottom: 12,
+  },
+  petOptionActive: {
+    borderColor: "#BDE8C9",
+    backgroundColor: "#F0FBF3",
+  },
+  petOptionImage: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#E7EEE9",
+  },
+  petOptionFallback: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#EAF8EE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  petOptionTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  petOptionName: {
+    color: "#17201A",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  petOptionNameActive: {
+    color: "#227B3E",
+  },
+  petOptionType: {
+    color: "#77827C",
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  otherPetOption: {
+    minHeight: 56,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DCE8E1",
+    backgroundColor: "#F9FCFA",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  otherPetOptionActive: {
+    borderColor: "#BDE8C9",
+    backgroundColor: "#F0FBF3",
+  },
+  otherPetIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: "#EAF8EE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  otherPetIconActive: {
+    backgroundColor: "#3DB85C",
+  },
+  otherTypeBlock: {
+    marginTop: 10,
+  },
+  petTypeChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  petTypeChip: {
+    minHeight: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "#DDE8E1",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  petTypeChipActive: {
+    borderColor: "#3DB85C",
+    backgroundColor: "#3DB85C",
+  },
+  petTypeChipText: {
+    color: "#546158",
+    fontSize: 12.5,
+    fontWeight: "700",
+  },
+  petTypeChipTextActive: {
+    color: "#FFFFFF",
+  },
+  inlineInput: {
+    marginTop: 10,
+    marginBottom: 0,
+  },
+  petTypeSummary: {
+    color: "#227B3E",
+    fontSize: 12.5,
+    fontWeight: "800",
+    marginBottom: 4,
   },
   imageCountText: {
     marginTop: -2,
@@ -513,6 +989,11 @@ const styles = StyleSheet.create({
     color: "#6F7C74",
     fontSize: 12.5,
     fontWeight: "600",
+  },
+  imageButtonsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 12,
   },
   imageActionButton: {
     flex: 1,

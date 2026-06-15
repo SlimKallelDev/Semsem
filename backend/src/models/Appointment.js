@@ -50,6 +50,43 @@ const appointmentSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    history: {
+      type: [
+        {
+          action: {
+            type: String,
+            enum: ["created", "date_updated", "status_updated"],
+            required: true,
+          },
+          actor: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+          },
+          fromStatus: {
+            type: String,
+            default: "",
+          },
+          toStatus: {
+            type: String,
+            default: "",
+          },
+          fromRequestedFor: {
+            type: Date,
+            default: null,
+          },
+          toRequestedFor: {
+            type: Date,
+            default: null,
+          },
+          createdAt: {
+            type: Date,
+            default: Date.now,
+          },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

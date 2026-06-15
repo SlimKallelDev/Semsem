@@ -40,6 +40,7 @@ import {
   formatUserTypeRatingWithCount,
   isVeterinaryUser,
 } from "../../constants/userDisplay";
+import { getPostTypeLabel } from "../../constants/postTypes";
 
 const getEntityId = (value) => {
   if (!value) return null;
@@ -59,6 +60,23 @@ const getDisplayName = (person) => {
   const full = [first, last].filter(Boolean).join(" ");
 
   return full || person?.email || "User";
+};
+
+const normalizeImageList = (...values) => {
+  const images = [];
+
+  values.forEach((value) => {
+    const list = Array.isArray(value) ? value : [value];
+
+    list.forEach((item) => {
+      const uri = String(item || "").trim();
+      if (uri && !images.includes(uri)) {
+        images.push(uri);
+      }
+    });
+  });
+
+  return images;
 };
 
 export default function PostDetailsScreen() {
@@ -84,12 +102,29 @@ export default function PostDetailsScreen() {
   const [likeSubmitting, setLikeSubmitting] = useState(false);
   const [likesModalVisible, setLikesModalVisible] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const postImages = useMemo(
+    () => normalizeImageList(post?.images, post?.image),
+    [post?.image, post?.images]
+  );
+  const activeImage = postImages[activeImageIndex] || "";
+  const hasMultipleImages = postImages.length > 1;
 
   useEffect(() => {
     if (id) {
       loadAll();
     }
   }, [id]);
+
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [id]);
+
+  useEffect(() => {
+    if (activeImageIndex >= postImages.length) {
+      setActiveImageIndex(0);
+    }
+  }, [activeImageIndex, postImages.length]);
 
   useEffect(() => {
     if (!id || !currentUserId) return;
@@ -157,10 +192,28 @@ export default function PostDetailsScreen() {
     return String(likeUserId) === String(currentUserId);
   });
 
+  const handleOpenLogin = () => {
+    router.push("/(auth)/login");
+  };
+
+  const showPreviousImage = () => {
+    if (!hasMultipleImages) return;
+    setActiveImageIndex((current) =>
+      current === 0 ? postImages.length - 1 : current - 1
+    );
+  };
+
+  const showNextImage = () => {
+    if (!hasMultipleImages) return;
+    setActiveImageIndex((current) =>
+      current === postImages.length - 1 ? 0 : current + 1
+    );
+  };
+
   const handleToggleLike = async () => {
     if (!currentUserId || likeSubmitting) {
       if (!currentUserId) {
-        Alert.alert("Error", "You need to be logged in");
+        handleOpenLogin();
       }
       return;
     }
@@ -185,7 +238,7 @@ export default function PostDetailsScreen() {
 
   const handleAddComment = async () => {
     if (!currentUserId) {
-      Alert.alert("Error", "You need to be logged in");
+      handleOpenLogin();
       return;
     }
 
@@ -236,8 +289,8 @@ export default function PostDetailsScreen() {
   };
 
   const locationText = [
-    post?.location?.governorate || post?.location?.city,
     post?.location?.country,
+    post?.location?.governorate || post?.location?.city,
   ]
     .filter(Boolean)
     .join(", ");
@@ -385,8 +438,34 @@ export default function PostDetailsScreen() {
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
           >
-            {!!post.image && (
-              <Image source={{ uri: post.image }} style={styles.image} />
+            {!!activeImage && (
+              <View style={styles.imageCarousel}>
+                <Image source={{ uri: activeImage }} style={styles.image} />
+
+                {hasMultipleImages ? (
+                  <>
+                    <TouchableOpacity
+                      style={[styles.imageArrowButton, styles.imageArrowLeft]}
+                      activeOpacity={0.82}
+                      onPress={showPreviousImage}
+                    >
+                      <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.imageArrowButton, styles.imageArrowRight]}
+                      activeOpacity={0.82}
+                      onPress={showNextImage}
+                    >
+                      <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+                    </TouchableOpacity>
+                    <View style={styles.imageCounter}>
+                      <ThemedText style={styles.imageCounterText}>
+                        {activeImageIndex + 1}/{postImages.length}
+                      </ThemedText>
+                    </View>
+                  </>
+                ) : null}
+              </View>
             )}
 
             <ThemedText type="title" style={styles.title}>
@@ -394,7 +473,7 @@ export default function PostDetailsScreen() {
             </ThemedText>
 
             <ThemedText style={styles.meta}>
-              {(post.type || "Post").toString()} | {(post.pet_type || "Pet").toString()}
+              {getPostTypeLabel(post.type)} | {(post.pet_type || "Pet").toString()}
             </ThemedText>
 
             {!!locationText && (
@@ -445,24 +524,37 @@ export default function PostDetailsScreen() {
             )}
 
             <View style={styles.actionsRow}>
-              <TouchableOpacity
-                style={[
-                  styles.likeButton,
-                  alreadyLiked && styles.likeButtonActive,
-                  likeSubmitting && styles.disabledButton,
-                ]}
-                onPress={handleToggleLike}
-                disabled={likeSubmitting}
-              >
-                <ThemedText
+              {currentUserId ? (
+                <TouchableOpacity
                   style={[
-                    styles.likeButtonText,
-                    alreadyLiked && styles.likeButtonTextActive,
+                    styles.likeButton,
+                    alreadyLiked && styles.likeButtonActive,
+                    likeSubmitting && styles.disabledButton,
                   ]}
+                  onPress={handleToggleLike}
+                  disabled={likeSubmitting}
                 >
-                  {alreadyLiked ? "Liked" : "Like"} ({likes.length})
-                </ThemedText>
-              </TouchableOpacity>
+                  <ThemedText
+                    style={[
+                      styles.likeButtonText,
+                      alreadyLiked && styles.likeButtonTextActive,
+                    ]}
+                  >
+                    {alreadyLiked ? "Liked" : "Like"} ({likes.length})
+                  </ThemedText>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.inlineLoginButton}
+                  activeOpacity={0.82}
+                  onPress={handleOpenLogin}
+                >
+                  <Ionicons name="log-in-outline" size={16} color="#444444" />
+                  <ThemedText style={styles.inlineLoginButtonText}>
+                    Login to like
+                  </ThemedText>
+                </TouchableOpacity>
+              )}
 
               {isOwner && (
                 <TouchableOpacity
@@ -515,27 +607,45 @@ export default function PostDetailsScreen() {
                 Comments ({comments.length})
               </ThemedText>
 
-              <View style={styles.commentInputRow}>
-                <TextInput
-                  style={styles.commentInput}
-                  placeholder="Write a comment..."
-                  value={commentText}
-                  onChangeText={setCommentText}
-                  multiline
-                />
-                <TouchableOpacity
-                  style={[
-                    styles.commentSendButton,
-                    commentSubmitting && styles.disabledButton,
-                  ]}
-                  onPress={handleAddComment}
-                  disabled={commentSubmitting}
-                >
-                  <ThemedText style={styles.commentSendText}>
-                    {commentSubmitting ? "..." : "Send"}
+              {currentUserId ? (
+                <View style={styles.commentInputRow}>
+                  <TextInput
+                    style={styles.commentInput}
+                    placeholder="Write a comment..."
+                    value={commentText}
+                    onChangeText={setCommentText}
+                    multiline
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.commentSendButton,
+                      commentSubmitting && styles.disabledButton,
+                    ]}
+                    onPress={handleAddComment}
+                    disabled={commentSubmitting}
+                  >
+                    <ThemedText style={styles.commentSendText}>
+                      {commentSubmitting ? "..." : "Send"}
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.commentLoginPrompt}>
+                  <ThemedText style={styles.commentLoginText}>
+                    Login to join the conversation.
                   </ThemedText>
-                </TouchableOpacity>
-              </View>
+                  <TouchableOpacity
+                    style={styles.inlineLoginButton}
+                    activeOpacity={0.82}
+                    onPress={handleOpenLogin}
+                  >
+                    <Ionicons name="log-in-outline" size={16} color="#444444" />
+                    <ThemedText style={styles.inlineLoginButtonText}>
+                      Login
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {comments.length === 0 ? (
                 <ThemedText style={styles.emptyText}>No comments yet.</ThemedText>
@@ -788,12 +898,50 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 24,
   },
-  image: {
+  imageCarousel: {
+    position: "relative",
     width: "100%",
     height: 280,
     borderRadius: 16,
     marginBottom: 16,
     backgroundColor: "#e9e9e9",
+    overflow: "hidden",
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#e9e9e9",
+  },
+  imageArrowButton: {
+    position: "absolute",
+    top: "50%",
+    width: 34,
+    height: 34,
+    marginTop: -17,
+    borderRadius: 17,
+    backgroundColor: "rgba(23, 32, 26, 0.58)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  imageArrowLeft: {
+    left: 10,
+  },
+  imageArrowRight: {
+    right: 10,
+  },
+  imageCounter: {
+    position: "absolute",
+    right: 10,
+    bottom: 10,
+    borderRadius: 999,
+    backgroundColor: "rgba(23, 32, 26, 0.62)",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  imageCounterText: {
+    color: "#FFFFFF",
+    fontSize: 11.5,
+    fontWeight: "800",
   },
   title: {
     marginBottom: 8,
@@ -896,6 +1044,21 @@ const styles = StyleSheet.create({
   likeButtonTextActive: {
     color: "#c0392b",
   },
+  inlineLoginButton: {
+    minHeight: 34,
+    paddingHorizontal: 16,
+    borderRadius: 17,
+    backgroundColor: "#E8E8E8",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  inlineLoginButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#444444",
+  },
   likersButton: {
     height: 44,
     borderRadius: 12,
@@ -964,6 +1127,25 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: 8,
     marginBottom: 16,
+  },
+  commentLoginPrompt: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E4EAE6",
+    backgroundColor: "#F8FAF8",
+    padding: 12,
+    marginBottom: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  commentLoginText: {
+    flex: 1,
+    minWidth: 0,
+    color: "#5C6861",
+    fontSize: 13.5,
+    fontWeight: "700",
   },
   commentInput: {
     flex: 1,
