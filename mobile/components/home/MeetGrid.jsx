@@ -5,6 +5,7 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useFocusEffect } from "expo-router";
@@ -84,7 +85,7 @@ export default function MeetGrid({ ownerId, selectedType = "all" }) {
 
         setPets(Array.isArray(data) ? data : []);
       } catch (err) {
-        console.error("Error loading pets:", err?.response?.data || err.message);
+        console.log("Error loading pets:", err?.response?.data || err.message);
         setError("Unable to load pets.");
       } finally {
         setLoading(false);
@@ -132,6 +133,13 @@ export default function MeetGrid({ ownerId, selectedType = "all" }) {
         <View style={styles.stateCard}>
           <Ionicons name="alert-circle-outline" size={24} color="#7A857F" />
           <ThemedText style={styles.stateText}>{error}</ThemedText>
+          <TouchableOpacity
+            style={styles.retryButton}
+            activeOpacity={0.86}
+            onPress={() => loadPets()}
+          >
+            <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -231,6 +239,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.72,
     textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 12,
+    minWidth: 96,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: GREEN,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800",
   },
   emptyState: {
     marginHorizontal: 14,

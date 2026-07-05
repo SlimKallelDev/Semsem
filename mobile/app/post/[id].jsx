@@ -8,12 +8,14 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -31,7 +33,11 @@ import {
   likePost,
   unlikePost,
 } from "../../services/likeService";
-import { deletePost, getPostById } from "../../services/postService";
+import {
+  deletePost,
+  getPostById,
+  reportPost,
+} from "../../services/postService";
 import { useUser } from "../../contexts/UserContext";
 import { emitNotificationsUpdated } from "../../services/notificationEvents";
 import { markNotificationsByResourceAsRead } from "../../services/notificationService";
@@ -79,6 +85,76 @@ const normalizeImageList = (...values) => {
   return images;
 };
 
+const REPORT_REASONS = [
+  {
+    value: "spam",
+    label: "Spam or scam",
+    description: "Advertising, fraud, or repeated unwanted content",
+    icon: "megaphone-outline",
+  },
+  {
+    value: "misleading",
+    label: "False information",
+    description: "Misleading title, description, price, or location",
+    icon: "alert-circle-outline",
+  },
+  {
+    value: "inappropriate",
+    label: "Inappropriate content",
+    description: "Content that should not appear on Semsem",
+    icon: "eye-off-outline",
+  },
+  {
+    value: "harassment",
+    label: "Harassment or abuse",
+    description: "Threatening, insulting, or targeted content",
+    icon: "hand-left-outline",
+  },
+  {
+    value: "other",
+    label: "Something else",
+    description: "A different issue that needs review",
+    icon: "ellipsis-horizontal-circle-outline",
+  },
+];
+
+function PostActionButton({
+  icon,
+  label,
+  onPress,
+  active = false,
+  danger = false,
+  disabled = false,
+}) {
+  const color = danger ? "#B53A3A" : active ? "#C73E4D" : "#45524B";
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.postActionButton,
+        active && styles.postActionButtonActive,
+        danger && styles.postActionButtonDanger,
+        disabled && styles.disabledButton,
+      ]}
+      onPress={onPress}
+      activeOpacity={0.78}
+      disabled={disabled}
+    >
+      <Ionicons name={icon} size={21} color={color} />
+      <ThemedText
+        style={[
+          styles.postActionButtonText,
+          active && styles.postActionButtonTextActive,
+          danger && styles.postActionButtonTextDanger,
+        ]}
+        numberOfLines={1}
+      >
+        {label}
+      </ThemedText>
+    </TouchableOpacity>
+  );
+}
+
 export default function PostDetailsScreen() {
   const { id } = useLocalSearchParams();
   const { user } = useUser();
@@ -101,6 +177,10 @@ export default function PostDetailsScreen() {
   const [deletingCommentId, setDeletingCommentId] = useState(null);
   const [likeSubmitting, setLikeSubmitting] = useState(false);
   const [likesModalVisible, setLikesModalVisible] = useState(false);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportReason, setReportReason] = useState("spam");
+  const [reportDetails, setReportDetails] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const postImages = useMemo(
@@ -218,8 +298,23 @@ export default function PostDetailsScreen() {
       return;
     }
 
+    const previousLikes = likes;
+    const nextLikes = alreadyLiked
+      ? likes.filter(
+          (like) =>
+            String(getEntityId(like?.user)) !== String(currentUserId)
+        )
+      : [
+          ...likes,
+          {
+            _id: `optimistic-${currentUserId}`,
+            user,
+          },
+        ];
+
     try {
       setLikeSubmitting(true);
+      setLikes(nextLikes);
 
       if (alreadyLiked) {
         await unlikePost(id);
@@ -229,10 +324,81 @@ export default function PostDetailsScreen() {
 
       await loadLikes();
     } catch (error) {
+      setLikes(previousLikes);
       console.log("Toggle like error:", error.message);
       Alert.alert("Error", error.message || "Failed to update like");
     } finally {
       setLikeSubmitting(false);
+    }
+  };
+
+  const handleSharePost = async () => {
+    try {
+      const postUrl = Linking.createURL(`/post/${id}`);
+      const description = String(post?.description || "").trim();
+      const excerpt =
+        description.length > 180
+          ? `${description.slice(0, 177).trim()}...`
+          : description;
+      const message = [post?.title, excerpt, postUrl].filter(Boolean).join("\n\n");
+
+      await Share.share({
+        title: post?.title || "Semsem post",
+        message,
+        url: postUrl,
+      });
+    } catch (error) {
+      console.log("Share post error:", error.message);
+      Alert.alert("Error", "Unable to open sharing options");
+    }
+  };
+
+  const handleOpenReport = () => {
+    if (!currentUserId) {
+      handleOpenLogin();
+      return;
+    }
+
+    if (isOwner) {
+      Alert.alert("Your post", "You cannot report your own post.");
+      return;
+    }
+
+    setReportModalVisible(true);
+  };
+
+  const handleCloseReport = () => {
+    if (reportSubmitting) return;
+    setReportModalVisible(false);
+  };
+
+  const handleSubmitReport = async () => {
+    if (!reportReason || reportSubmitting) return;
+
+    if (reportReason === "other" && !reportDetails.trim()) {
+      Alert.alert("Add details", "Please briefly explain the issue.");
+      return;
+    }
+
+    try {
+      setReportSubmitting(true);
+      const response = await reportPost(id, {
+        reason: reportReason,
+        details: reportDetails.trim(),
+      });
+
+      setReportModalVisible(false);
+      setReportReason("spam");
+      setReportDetails("");
+      Alert.alert(
+        "Report submitted",
+        response?.message || "Thank you. The Semsem team will review this post."
+      );
+    } catch (error) {
+      console.log("Report post error:", error.message);
+      Alert.alert("Unable to report", error.message || "Please try again later.");
+    } finally {
+      setReportSubmitting(false);
     }
   };
 
@@ -523,84 +689,93 @@ export default function PostDetailsScreen() {
               </ThemedText>
             )}
 
-            <View style={styles.actionsRow}>
-              {currentUserId ? (
-                <TouchableOpacity
-                  style={[
-                    styles.likeButton,
-                    alreadyLiked && styles.likeButtonActive,
-                    likeSubmitting && styles.disabledButton,
-                  ]}
-                  onPress={handleToggleLike}
+            <View style={styles.postActionsPanel}>
+              <View style={styles.postActionsRow}>
+                <PostActionButton
+                  icon={alreadyLiked ? "heart" : "heart-outline"}
+                  label={`${alreadyLiked ? "Liked" : "Like"} ${likes.length}`}
+                  active={alreadyLiked}
                   disabled={likeSubmitting}
-                >
-                  <ThemedText
-                    style={[
-                      styles.likeButtonText,
-                      alreadyLiked && styles.likeButtonTextActive,
-                    ]}
-                  >
-                    {alreadyLiked ? "Liked" : "Like"} ({likes.length})
-                  </ThemedText>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={styles.inlineLoginButton}
-                  activeOpacity={0.82}
-                  onPress={handleOpenLogin}
-                >
-                  <Ionicons name="log-in-outline" size={16} color="#444444" />
-                  <ThemedText style={styles.inlineLoginButtonText}>
-                    Login to like
-                  </ThemedText>
-                </TouchableOpacity>
-              )}
+                  onPress={handleToggleLike}
+                />
+                <PostActionButton
+                  icon="share-social-outline"
+                  label="Share"
+                  onPress={handleSharePost}
+                />
+                {!isOwner ? (
+                  <PostActionButton
+                    icon="flag-outline"
+                    label="Report"
+                    danger
+                    onPress={handleOpenReport}
+                  />
+                ) : null}
+              </View>
 
-              {isOwner && (
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => router.push(`/post/edit/${id}`)}
-                >
-                  <ThemedText style={styles.editButtonText}>Edit</ThemedText>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <TouchableOpacity
-              style={[
-                styles.likersButton,
-                !likes.length && styles.likersButtonDisabled,
-              ]}
-              onPress={handleOpenLikesModal}
-              activeOpacity={0.8}
-              disabled={!likes.length}
-            >
-              <Ionicons
-                name="people-outline"
-                size={17}
-                color={likes.length ? "#51615A" : "#93A198"}
-              />
-              <ThemedText
-                style={[
-                  styles.likersButtonText,
-                  !likes.length && styles.likersButtonTextDisabled,
-                ]}
-              >
-                {likes.length ? `See who liked (${likes.length})` : "No likes yet"}
-              </ThemedText>
-            </TouchableOpacity>
-
-            {isOwner && (
               <TouchableOpacity
-                style={[styles.deleteButton, deleting && styles.disabledButton]}
-                onPress={handleDeletePost}
-                disabled={deleting}
+                style={[
+                  styles.likersButton,
+                  !likes.length && styles.likersButtonDisabled,
+                ]}
+                onPress={handleOpenLikesModal}
+                activeOpacity={0.8}
+                disabled={!likes.length}
               >
-                <ThemedText style={styles.deleteButtonText}>
-                  {deleting ? "Deleting..." : "Delete Post"}
+                <Ionicons
+                  name="people-outline"
+                  size={17}
+                  color={likes.length ? "#51615A" : "#93A198"}
+                />
+                <ThemedText
+                  style={[
+                    styles.likersButtonText,
+                    !likes.length && styles.likersButtonTextDisabled,
+                  ]}
+                >
+                  {likes.length
+                    ? `View ${likes.length} ${likes.length === 1 ? "like" : "likes"}`
+                    : "Be the first to like this post"}
                 </ThemedText>
+                {likes.length ? (
+                  <Ionicons name="chevron-forward" size={16} color="#7C8982" />
+                ) : null}
               </TouchableOpacity>
-            )}
+
+              {isOwner ? (
+                <View style={styles.ownerActionsRow}>
+                  <TouchableOpacity
+                    style={styles.ownerActionButton}
+                    onPress={() => router.push(`/post/edit/${id}`)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="create-outline" size={19} color="#34423A" />
+                    <ThemedText style={styles.ownerActionText}>
+                      Edit post
+                    </ThemedText>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.ownerActionButton,
+                      styles.ownerDeleteButton,
+                      deleting && styles.disabledButton,
+                    ]}
+                    onPress={handleDeletePost}
+                    disabled={deleting}
+                    activeOpacity={0.8}
+                  >
+                    {deleting ? (
+                      <ActivityIndicator size="small" color="#B53A3A" />
+                    ) : (
+                      <Ionicons name="trash-outline" size={19} color="#B53A3A" />
+                    )}
+                    <ThemedText style={styles.ownerDeleteText}>
+                      {deleting ? "Deleting..." : "Delete post"}
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+            </View>
 
             <View style={styles.commentsSection}>
               <ThemedText style={styles.sectionTitle}>
@@ -777,6 +952,141 @@ export default function PostDetailsScreen() {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+
+        <Modal
+          visible={reportModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={handleCloseReport}
+        >
+          <KeyboardAvoidingView
+            style={styles.reportModalBackdrop}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+          >
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={handleCloseReport}
+            />
+
+            <View
+              style={[
+                styles.reportModalCard,
+                { paddingBottom: Math.max(16, insets.bottom + 8) },
+              ]}
+            >
+              <View style={styles.reportModalHeader}>
+                <View style={styles.reportModalTitleRow}>
+                  <View style={styles.reportModalIcon}>
+                    <Ionicons name="flag-outline" size={20} color="#B53A3A" />
+                  </View>
+                  <View style={styles.reportModalHeading}>
+                    <ThemedText style={styles.reportModalTitle}>
+                      Report this post
+                    </ThemedText>
+                    <ThemedText style={styles.reportModalSubtitle}>
+                      Your report is private and will be reviewed.
+                    </ThemedText>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={styles.reportModalClose}
+                  onPress={handleCloseReport}
+                  disabled={reportSubmitting}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="close" size={19} color="#51615A" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                style={styles.reportReasonsScroll}
+                contentContainerStyle={styles.reportReasonsList}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {REPORT_REASONS.map((reason) => {
+                  const selected = reportReason === reason.value;
+
+                  return (
+                    <Pressable
+                      key={reason.value}
+                      style={[
+                        styles.reportReasonRow,
+                        selected && styles.reportReasonRowSelected,
+                      ]}
+                      onPress={() => setReportReason(reason.value)}
+                    >
+                      <Ionicons
+                        name={reason.icon}
+                        size={20}
+                        color={selected ? "#26352D" : "#6E7B74"}
+                      />
+                      <View style={styles.reportReasonTextWrap}>
+                        <ThemedText style={styles.reportReasonLabel}>
+                          {reason.label}
+                        </ThemedText>
+                        <ThemedText style={styles.reportReasonDescription}>
+                          {reason.description}
+                        </ThemedText>
+                      </View>
+                      <Ionicons
+                        name={selected ? "radio-button-on" : "radio-button-off"}
+                        size={20}
+                        color={selected ? "#2A9448" : "#A0AAA4"}
+                      />
+                    </Pressable>
+                  );
+                })}
+
+                <ThemedText style={styles.reportDetailsLabel}>
+                  Additional details {reportReason === "other" ? "*" : "(optional)"}
+                </ThemedText>
+                <TextInput
+                  style={styles.reportDetailsInput}
+                  value={reportDetails}
+                  onChangeText={setReportDetails}
+                  placeholder="Help the moderation team understand the issue..."
+                  placeholderTextColor="#929C96"
+                  multiline
+                  maxLength={500}
+                  textAlignVertical="top"
+                />
+                <ThemedText style={styles.reportCharacterCount}>
+                  {reportDetails.length}/500
+                </ThemedText>
+              </ScrollView>
+
+              <View style={styles.reportModalActions}>
+                <TouchableOpacity
+                  style={styles.reportCancelButton}
+                  onPress={handleCloseReport}
+                  disabled={reportSubmitting}
+                  activeOpacity={0.8}
+                >
+                  <ThemedText style={styles.reportCancelText}>Cancel</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.reportSubmitButton,
+                    reportSubmitting && styles.disabledButton,
+                  ]}
+                  onPress={handleSubmitReport}
+                  disabled={reportSubmitting}
+                  activeOpacity={0.8}
+                >
+                  {reportSubmitting ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Ionicons name="flag" size={17} color="#FFFFFF" />
+                  )}
+                  <ThemedText style={styles.reportSubmitText}>
+                    {reportSubmitting ? "Submitting..." : "Submit report"}
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
 
         <Modal
           visible={likesModalVisible}
@@ -1023,26 +1333,52 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 18,
   },
-  actionsRow: {
+  postActionsPanel: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#DDE6E0",
+    backgroundColor: "#FFFFFF",
+    padding: 10,
+    marginBottom: 18,
+  },
+  postActionsRow: {
+    minHeight: 68,
     flexDirection: "row",
-    gap: 10,
-    marginBottom: 12,
+    gap: 8,
   },
-  likeButton: {
+  postActionButton: {
     flex: 1,
-    backgroundColor: "#f2f2f2",
-    paddingVertical: 12,
+    minWidth: 0,
+    height: 64,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E1E8E3",
+    backgroundColor: "#F7F9F7",
     alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 5,
+    gap: 4,
   },
-  likeButtonActive: {
-    backgroundColor: "#fde7ea",
+  postActionButtonActive: {
+    borderColor: "#F0C8CD",
+    backgroundColor: "#FFF3F4",
   },
-  likeButtonText: {
-    fontWeight: "700",
+  postActionButtonDanger: {
+    borderColor: "#E8D7D7",
+    backgroundColor: "#FFF9F9",
   },
-  likeButtonTextActive: {
-    color: "#c0392b",
+  postActionButtonText: {
+    maxWidth: "100%",
+    fontSize: 12.5,
+    lineHeight: 16,
+    fontWeight: "800",
+    color: "#45524B",
+  },
+  postActionButtonTextActive: {
+    color: "#C73E4D",
+  },
+  postActionButtonTextDanger: {
+    color: "#B53A3A",
   },
   inlineLoginButton: {
     minHeight: 34,
@@ -1062,11 +1398,9 @@ const styles = StyleSheet.create({
   likersButton: {
     height: 44,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#DEE7E1",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F3F6F4",
     paddingHorizontal: 12,
-    marginBottom: 14,
+    marginTop: 8,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -1076,6 +1410,7 @@ const styles = StyleSheet.create({
     opacity: 0.65,
   },
   likersButtonText: {
+    flexShrink: 1,
     fontSize: 14,
     fontWeight: "700",
     color: "#51615A",
@@ -1083,27 +1418,40 @@ const styles = StyleSheet.create({
   likersButtonTextDisabled: {
     color: "#8F9C95",
   },
-  editButton: {
+  ownerActionsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#E8EDE9",
+  },
+  ownerActionButton: {
     flex: 1,
-    backgroundColor: "#4CAF50",
-    paddingVertical: 12,
+    height: 44,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#D9E2DC",
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    gap: 6,
   },
-  editButtonText: {
-    color: "#fff",
-    fontWeight: "700",
+  ownerDeleteButton: {
+    borderColor: "#E6CFCF",
+    backgroundColor: "#FFF9F9",
   },
-  deleteButton: {
-    backgroundColor: "#e74c3c",
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: "center",
-    marginBottom: 18,
+  ownerActionText: {
+    fontSize: 13.5,
+    fontWeight: "800",
+    color: "#34423A",
   },
-  deleteButtonText: {
-    color: "#fff",
-    fontWeight: "700",
+  ownerDeleteText: {
+    fontSize: 13.5,
+    fontWeight: "800",
+    color: "#B53A3A",
   },
   disabledButton: {
     opacity: 0.7,
@@ -1274,6 +1622,165 @@ const styles = StyleSheet.create({
   },
   commentText: {
     lineHeight: 20,
+  },
+  reportModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(19, 27, 23, 0.42)",
+    justifyContent: "flex-end",
+  },
+  reportModalCard: {
+    maxHeight: "88%",
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderWidth: 1,
+    borderColor: "#DFE8E2",
+    paddingTop: 14,
+    paddingHorizontal: 14,
+  },
+  reportModalHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+    marginBottom: 12,
+  },
+  reportModalTitleRow: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  reportModalIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#FFF2F2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reportModalHeading: {
+    flex: 1,
+    minWidth: 0,
+  },
+  reportModalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#1F2A24",
+  },
+  reportModalSubtitle: {
+    marginTop: 2,
+    fontSize: 12.5,
+    lineHeight: 17,
+    color: "#748078",
+  },
+  reportModalClose: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#F0F5F2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reportReasonsScroll: {
+    flexGrow: 0,
+  },
+  reportReasonsList: {
+    paddingBottom: 6,
+  },
+  reportReasonRow: {
+    minHeight: 62,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8E4",
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 8,
+    gap: 10,
+  },
+  reportReasonRowSelected: {
+    borderColor: "#91C9A2",
+    backgroundColor: "#F3FAF5",
+  },
+  reportReasonTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  reportReasonLabel: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#26352D",
+  },
+  reportReasonDescription: {
+    marginTop: 2,
+    fontSize: 11.5,
+    lineHeight: 15,
+    color: "#78837D",
+  },
+  reportDetailsLabel: {
+    marginTop: 3,
+    marginBottom: 7,
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#3C4942",
+  },
+  reportDetailsInput: {
+    minHeight: 88,
+    maxHeight: 130,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#DCE4DF",
+    backgroundColor: "#FAFBFA",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: "#26312B",
+  },
+  reportCharacterCount: {
+    marginTop: 4,
+    textAlign: "right",
+    fontSize: 11,
+    color: "#87918B",
+  },
+  reportModalActions: {
+    flexDirection: "row",
+    gap: 8,
+    paddingTop: 10,
+  },
+  reportCancelButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#DCE4DF",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reportCancelText: {
+    fontSize: 13.5,
+    fontWeight: "800",
+    color: "#4D5B53",
+  },
+  reportSubmitButton: {
+    flex: 1.35,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: "#B53A3A",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    gap: 7,
+  },
+  reportSubmitText: {
+    fontSize: 13.5,
+    fontWeight: "800",
+    color: "#FFFFFF",
   },
   likesModalBackdrop: {
     flex: 1,

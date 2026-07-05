@@ -122,6 +122,7 @@ export default function LocationSelector({
                 placeholderTextColor="#94A19A"
                 value={search}
                 onChangeText={setSearch}
+                autoFocus
                 autoCapitalize="words"
                 autoCorrect={false}
               />

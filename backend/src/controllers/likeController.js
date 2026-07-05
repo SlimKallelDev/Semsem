@@ -2,6 +2,17 @@ const Like = require("../models/Like");
 const Post = require("../models/Post");
 const { createNotification } = require("../services/notificationService");
 const { USER_PUBLIC_FIELDS } = require("../constants/userPublicFields");
+const {
+  POST_STATUS,
+  USER_STATUS,
+} = require("../constants/moderationStatuses");
+
+const findPublishedPost = (postId) =>
+  Post.findOne({ _id: postId, status: POST_STATUS.PUBLISHED }).populate({
+    path: "user",
+    match: { status: USER_STATUS.ACTIVE },
+    select: "_id",
+  });
 
 const likePost = async (req, res, next) => {
   try {
@@ -17,9 +28,9 @@ const likePost = async (req, res, next) => {
       return res.status(400).json({ message: "userId is required" });
     }
 
-    const post = await Post.findById(postId);
+    const post = await findPublishedPost(postId);
 
-    if (!post) {
+    if (!post || !post.user) {
       return res.status(404).json({ message: "Post not found" });
     }
 
@@ -104,6 +115,11 @@ const unlikePost = async (req, res, next) => {
 const getLikesByPost = async (req, res, next) => {
   try {
     const { postId } = req.params;
+    const post = await findPublishedPost(postId);
+
+    if (!post || !post.user) {
+      return res.status(404).json({ message: "Post not found" });
+    }
 
     const likes = await Like.find({ post: postId })
       .populate("user", USER_PUBLIC_FIELDS)

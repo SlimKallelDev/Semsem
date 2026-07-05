@@ -3,12 +3,12 @@ const UserReview = require("../models/UserReview");
 const bcrypt = require("bcryptjs");
 const { uploadAvatarBuffer } = require("../services/cloudinaryService");
 const {
-  USER_PROFILE_TYPES,
   isPublicProfileType,
   normalizeProfileType,
   resolveUserProfileType,
 } = require("../constants/profileTypes");
 const { USER_PUBLIC_FIELDS } = require("../constants/userPublicFields");
+const { USER_STATUS } = require("../constants/moderationStatuses");
 
 const REVIEW_MIN = 1;
 const REVIEW_MAX = 5;
@@ -108,11 +108,7 @@ const createUser = async (req, res, next) => {
 
     if (!isPublicProfileType(normalizedProfileType)) {
       res.status(400);
-      throw new Error(
-        normalizedProfileType === USER_PROFILE_TYPES.ADMIN
-          ? "Admin profile type can only be assigned manually"
-          : "Invalid profile type"
-      );
+      throw new Error("Invalid profile type");
     }
 
     const existingUser = await User.findOne({ email: normalizedEmail });
@@ -139,6 +135,7 @@ const createUser = async (req, res, next) => {
       avatar,
       role,
       profileType: normalizedProfileType,
+      status: USER_STATUS.ACTIVE,
     });
 
     res.status(201).json({
@@ -146,6 +143,7 @@ const createUser = async (req, res, next) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      status: user.status,
       governorate: user.governorate || user.city || "",
       country: user.country,
       phone: user.phone,
@@ -164,7 +162,9 @@ const createUser = async (req, res, next) => {
 
 const getUsers = async (req, res, next) => {
   try {
-    const users = await User.find().select("-password");
+    const users = await User.find({ status: USER_STATUS.ACTIVE }).select(
+      "-password"
+    );
     const usersWithProfileType = users.map(mapUserWithProfileType);
     res.status(200).json(usersWithProfileType);
   } catch (error) {
@@ -174,7 +174,10 @@ const getUsers = async (req, res, next) => {
 
 const getUser = async (req, res, next) => {
   try {
-    const user = await User.findById(req.params.id).select("-password");
+    const user = await User.findOne({
+      _id: req.params.id,
+      status: USER_STATUS.ACTIVE,
+    }).select("-password");
 
     if (!user) {
       res.status(404);
@@ -198,7 +201,26 @@ const getUser = async (req, res, next) => {
 
 const updateUser = async (req, res, next) => {
   try {
+    const requester = await User.findById(req.user?.userId).select("role");
+    const isOwner = String(req.user?.userId) === String(req.params.id);
+    const isAdmin = requester?.role === "admin";
+
+    if (!requester) {
+      res.status(401);
+      throw new Error("Unauthorized");
+    }
+
+    if (!isOwner && !isAdmin) {
+      res.status(403);
+      throw new Error("Not authorized to update this user");
+    }
+
     const updates = { ...req.body };
+
+    if (!isAdmin) {
+      delete updates.role;
+      delete updates.status;
+    }
 
     if (updates.governorate === undefined && updates.city !== undefined) {
       updates.governorate = updates.city;
@@ -223,11 +245,7 @@ const updateUser = async (req, res, next) => {
 
       if (!isPublicProfileType(normalizedProfileType)) {
         res.status(400);
-        throw new Error(
-          normalizedProfileType === USER_PROFILE_TYPES.ADMIN
-            ? "Admin profile type can only be assigned manually"
-            : "Invalid profile type"
-        );
+        throw new Error("Invalid profile type");
       }
 
       updates.profileType = normalizedProfileType;
@@ -381,6 +399,20 @@ const deleteMyUserReview = async (req, res, next) => {
 
 const deleteUser = async (req, res, next) => {
   try {
+    const requester = await User.findById(req.user?.userId).select("role");
+    const isOwner = String(req.user?.userId) === String(req.params.id);
+    const isAdmin = requester?.role === "admin";
+
+    if (!requester) {
+      res.status(401);
+      throw new Error("Unauthorized");
+    }
+
+    if (!isOwner && !isAdmin) {
+      res.status(403);
+      throw new Error("Not authorized to delete this user");
+    }
+
     const user = await User.findByIdAndDelete(req.params.id);
 
     if (!user) {

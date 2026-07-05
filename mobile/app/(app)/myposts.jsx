@@ -15,7 +15,7 @@ import { router } from "expo-router";
 import ThemedText from "../../components/ThemedText";
 import { getPostTypeLabel } from "../../constants/postTypes";
 import { useUser } from "../../contexts/UserContext";
-import { getPostsByUser } from "../../services/postService";
+import { getMyPosts } from "../../services/postService";
 
 const GREEN = "#3DB85C";
 
@@ -36,15 +36,19 @@ function capitalize(str) {
 }
 
 const STATUS_STYLES = {
-  active: { bg: "#E8F8EE", text: GREEN },
-  approved: { bg: "#E8F8EE", text: GREEN },
-  pending: { bg: "#FFF3E0", text: "#E07B00" },
-  rejected: { bg: "#FEECEC", text: "#D63031" },
-  closed: { bg: "#F0F0F0", text: "#888" },
+  published: { bg: "#E8F8EE", text: GREEN },
+  blocked: { bg: "#FEECEC", text: "#D63031" },
 };
 
+function normalizePostStatus(status) {
+  const value = String(status || "published").toLowerCase();
+  return ["blocked", "rejected", "archived"].includes(value)
+    ? "blocked"
+    : "published";
+}
+
 function statusStyle(status) {
-  return STATUS_STYLES[(status || "").toLowerCase()] || { bg: "#F0F0F0", text: "#888" };
+  return STATUS_STYLES[normalizePostStatus(status)];
 }
 
 const TYPE_COLORS = {
@@ -67,13 +71,16 @@ function PostRow({ item }) {
     "https://via.placeholder.com/200x200.png?text=Post";
 
   const sStyle = statusStyle(item?.status);
+  const displayStatus = normalizePostStatus(item?.status);
+  const isBlocked = displayStatus === "blocked";
   const tColor = typeColor(item?.type);
 
   return (
     <TouchableOpacity
       activeOpacity={0.88}
-      style={styles.card}
-      onPress={() => postId && router.push(`/post/${postId}`)}
+      style={[styles.card, isBlocked && styles.cardBlocked]}
+      disabled={isBlocked}
+      onPress={() => !isBlocked && postId && router.push(`/post/${postId}`)}
     >
       <Image source={{ uri: imageUri }} style={styles.cardImage} />
 
@@ -97,7 +104,7 @@ function PostRow({ item }) {
               </ThemedText>
             </View>
           )}
-          {!!item?.status && (
+          {!!displayStatus && (
             <View
               style={[
                 styles.statusTag,
@@ -105,7 +112,7 @@ function PostRow({ item }) {
               ]}
             >
               <ThemedText style={[styles.statusTagText, { color: sStyle.text }]}>
-                {capitalize(item.status)}
+                {capitalize(displayStatus)}
               </ThemedText>
             </View>
           )}
@@ -129,7 +136,8 @@ function PostRow({ item }) {
       <TouchableOpacity
         style={styles.menuBtn}
         activeOpacity={0.7}
-        onPress={() => postId && router.push(`/post/${postId}`)}
+        disabled={isBlocked}
+        onPress={() => !isBlocked && postId && router.push(`/post/${postId}`)}
         hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
       >
         <Ionicons name="ellipsis-vertical" size={18} color="#B0BAB5" />
@@ -141,13 +149,13 @@ function PostRow({ item }) {
 function StatsRow({ posts }) {
   const total = posts.length;
   const active = posts.filter(
-    (p) => (p?.status || "").toLowerCase() === "active" || (p?.status || "").toLowerCase() === "approved"
+    (p) => normalizePostStatus(p?.status) === "published"
   ).length;
   const likes = posts.reduce((sum, p) => sum + (p?.likes_count || 0), 0);
 
   const stats = [
     { value: total, label: "Total" },
-    { value: active, label: "Active" },
+    { value: active, label: "Published" },
     { value: likes, label: "Likes" },
   ];
 
@@ -184,7 +192,7 @@ export default function MyPosts({ embedded = false, onCountChange } = {}) {
       return;
     }
     try {
-      const data = await getPostsByUser(userId);
+      const data = await getMyPosts();
       const nextPosts = Array.isArray(data) ? data : [];
       setPosts(nextPosts);
       onCountChange?.(nextPosts.length);
@@ -363,6 +371,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.07,
     shadowRadius: 8,
     elevation: 2,
+  },
+  cardBlocked: {
+    opacity: 0.72,
+    borderColor: "#E7BABA",
   },
   cardImage: {
     width: 78,

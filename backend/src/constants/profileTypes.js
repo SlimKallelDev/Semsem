@@ -7,7 +7,6 @@ const USER_PROFILE_TYPES = Object.freeze({
   PET_SITTERS: "pet_sitters",
   GROOMER: "groomer",
   PET_SHOPS: "pet_shops",
-  ADMIN: "admin",
   BOARDING: "boarding",
 });
 
@@ -28,10 +27,7 @@ const isValidProfileType = (value) => {
 
 const isPublicProfileType = (value) => {
   const normalized = normalizeProfileType(value);
-  return (
-    normalized !== USER_PROFILE_TYPES.ADMIN &&
-    USER_PROFILE_TYPE_VALUES.includes(normalized)
-  );
+  return USER_PROFILE_TYPE_VALUES.includes(normalized);
 };
 
 const resolveUserProfileType = (value) => {

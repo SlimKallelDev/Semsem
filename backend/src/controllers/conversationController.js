@@ -13,7 +13,7 @@ const populateConversation = (query) =>
 
 const getUserConversations = async (req, res, next) => {
   try {
-    const { userId } = req.params;
+    const userId = req.user.userId;
 
     const conversations = await populateConversation(
       Conversation.find({
@@ -32,7 +32,10 @@ const getConversationById = async (req, res, next) => {
     const { conversationId } = req.params;
 
     const conversation = await populateConversation(
-      Conversation.findById(conversationId)
+      Conversation.findOne({
+        _id: conversationId,
+        participants: req.user.userId,
+      })
     );
 
     if (!conversation) {

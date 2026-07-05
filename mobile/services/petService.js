@@ -1,11 +1,6 @@
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import API_BASE_URL from "./api";
+import API_BASE_URL, { createApiClient } from "./api";
 
-const API = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 30000,
-});
+const API = createApiClient();
 
 const FILE_URI_PATTERN = /^(file|content|ph|assets-library|asset):\/\//i;
 const HTTP_URL_PATTERN = /^https?:\/\//i;
@@ -19,22 +14,6 @@ const MIME_BY_EXTENSION = {
   heic: "image/heic",
   heif: "image/heif",
 };
-
-API.interceptors.request.use(
-  async (config) => {
-    const token = await AsyncStorage.getItem("token");
-
-    if (token) {
-      config.headers = {
-        ...config.headers,
-        Authorization: `Bearer ${token}`,
-      };
-    }
-
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
 
 const isLocalImageUri = (value) => {
   if (typeof value !== "string") return false;

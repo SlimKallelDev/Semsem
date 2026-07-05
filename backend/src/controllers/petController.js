@@ -5,6 +5,7 @@ const {
   normalizeProfileType,
 } = require("../constants/profileTypes");
 const { uploadPetImageBuffer } = require("../services/cloudinaryService");
+const { USER_STATUS } = require("../constants/moderationStatuses");
 
 const OWNER_FIELDS =
   "_id name email avatar image governorate country profileType ratingAverage ratingCount";
@@ -378,8 +379,14 @@ const toBase64Url = (value) =>
 const getPets = async (req, res, next) => {
   try {
     const locationFilter = buildPetLocationFilter(req.query);
+    const activeOwnerIds = await User.find({
+      status: USER_STATUS.ACTIVE,
+    }).distinct("_id");
 
-    const pets = await Pet.find(locationFilter)
+    const pets = await Pet.find({
+      ...locationFilter,
+      owner: { $in: activeOwnerIds },
+    })
       .populate("owner", OWNER_FIELDS)
       .sort({ createdAt: -1 });
 
@@ -392,7 +399,13 @@ const getPets = async (req, res, next) => {
 
 const getPetById = async (req, res, next) => {
   try {
-    const pet = await Pet.findById(req.params.id).populate("owner", OWNER_FIELDS);
+    const activeOwnerIds = await User.find({
+      status: USER_STATUS.ACTIVE,
+    }).distinct("_id");
+    const pet = await Pet.findOne({
+      _id: req.params.id,
+      owner: { $in: activeOwnerIds },
+    }).populate("owner", OWNER_FIELDS);
 
     if (!pet) {
       return res.status(404).json({ message: "Pet not found" });
@@ -407,6 +420,15 @@ const getPetById = async (req, res, next) => {
 
 const getPetsByOwner = async (req, res, next) => {
   try {
+    const activeOwner = await User.exists({
+      _id: req.params.ownerId,
+      status: USER_STATUS.ACTIVE,
+    });
+
+    if (!activeOwner) {
+      return res.status(200).json([]);
+    }
+
     const pets = await Pet.find({ owner: req.params.ownerId })
       .populate("owner", OWNER_FIELDS)
       .sort({ createdAt: -1 });
@@ -420,13 +442,14 @@ const getPetsByOwner = async (req, res, next) => {
 
 const createPet = async (req, res, next) => {
   try {
-    const { owner, name, type, breed, date, description, location, careRecord } =
+    const { name, type, breed, date, description, location, careRecord } =
       req.body;
+    const owner = req.user.userId;
 
-    if (!owner || !name || !type) {
+    if (!name || !type) {
       return res
         .status(400)
-        .json({ message: "owner, name and type are required" });
+        .json({ message: "name and type are required" });
     }
 
     const normalizedLocation = parseLocationInput(location);
@@ -487,7 +510,14 @@ const updatePet = async (req, res, next) => {
       return res.status(404).json({ message: "Pet not found" });
     }
 
+    const isOwner = String(pet.owner) === String(req.user.userId);
+    const isAdmin = req.user.role === "admin";
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ message: "Not authorized to update this pet" });
+    }
+
     const updates = { ...req.body };
+    delete updates.owner;
     if (updates.location !== undefined) {
       const normalizedLocation = parseLocationInput(updates.location);
 
@@ -529,11 +559,19 @@ const updatePet = async (req, res, next) => {
 
 const deletePet = async (req, res, next) => {
   try {
-    const pet = await Pet.findByIdAndDelete(req.params.id);
+    const pet = await Pet.findById(req.params.id);
 
     if (!pet) {
       return res.status(404).json({ message: "Pet not found" });
     }
+
+    const isOwner = String(pet.owner) === String(req.user.userId);
+    const isAdmin = req.user.role === "admin";
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ message: "Not authorized to delete this pet" });
+    }
+
+    await pet.deleteOne();
 
     res.status(200).json({ message: "Pet deleted successfully" });
   } catch (error) {

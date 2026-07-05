@@ -1,7 +1,9 @@
 const jwt = require("jsonwebtoken");
 const env = require("../config/env");
+const User = require("../models/User");
+const { USER_STATUS } = require("../constants/moderationStatuses");
 
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -18,10 +20,26 @@ const authMiddleware = (req, res, next) => {
     const token = authHeader.split(" ")[1];
 
     const decoded = jwt.verify(token, env.JWT_SECRET);
+    const user = await User.findById(decoded.userId).select(
+      "_id name email role status"
+    );
+
+    if (!user) {
+      res.status(401);
+      throw new Error("Account not found");
+    }
+
+    if (user.status !== USER_STATUS.ACTIVE) {
+      res.status(403);
+      throw new Error("This account has been blocked by an administrator");
+    }
 
     req.user = {
-      userId: decoded.userId,
+      userId: user._id,
+      role: user.role,
+      status: user.status,
     };
+    req.authUser = user;
 
     next();
   } catch (error) {

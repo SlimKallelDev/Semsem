@@ -8,7 +8,7 @@ import {
 } from "./governorates";
 
 const trimValue = (value) => String(value || "").trim();
-let cachedLocationOptions = null;
+let cachedLocationSearchIndex = null;
 
 const FEATURED_CITY_COUNTRIES = {
   almarsa: ["Tunisia"],
@@ -111,16 +111,41 @@ const addOption = (options, optionByKey, country, governorate, aliases = []) => 
   options.push(option);
 };
 
+const CURATED_LOCATION_KEYS = new Set(
+  Object.entries(GOVERNORATES_BY_COUNTRY).flatMap(([country, cities]) =>
+    cities.map(
+      (city) =>
+        `${normalizeLocationKey(country)}:${normalizeLocationKey(city)}`
+    )
+  )
+);
+
 const getCountryNameByCode = () =>
   Country.getAllCountries().reduce((result, country) => {
     result[country.isoCode] = resolveCountryName(country.name);
     return result;
   }, {});
 
-const buildLocationOptions = () => {
+const addRowToBucket = (buckets, key, row) => {
+  const normalizedKey = normalizeLocationKey(trimValue(key).slice(0, 12));
+  if (!normalizedKey) return;
+
+  const prefixes = new Set([
+    normalizedKey.charAt(0),
+    normalizedKey.slice(0, 2),
+  ]);
+
+  prefixes.forEach((prefix) => {
+    if (!buckets.has(prefix)) {
+      buckets.set(prefix, []);
+    }
+
+    buckets.get(prefix).push(row);
+  });
+};
+
+const buildLocationSearchIndex = () => {
   const countryNameByCode = getCountryNameByCode();
-  const options = [];
-  const optionByKey = new Map();
   const governorateNameByCode = State.getAllStates().reduce((result, state) => {
     if (isGovernorateName(state.name)) {
       result[`${state.countryCode}:${state.isoCode}`] = cleanAdminName(state.name);
@@ -128,33 +153,41 @@ const buildLocationOptions = () => {
 
     return result;
   }, {});
+  const placeBuckets = new Map();
+  const countryBuckets = new Map();
 
   City.getAllCities().forEach((city) => {
+    const country = countryNameByCode[city.countryCode] || city.countryCode;
     const governorateName =
       governorateNameByCode[`${city.countryCode}:${city.stateCode}`];
+    const row = {
+      city,
+      country,
+      governorate: governorateName || city.name,
+    };
+    const cityWithoutArticle = trimValue(city.name)
+      .replace(LEADING_ARTICLE_PATTERN, "")
+      .trim();
 
-    addOption(
-      options,
-      optionByKey,
-      countryNameByCode[city.countryCode] || city.countryCode,
-      governorateName || city.name,
-      [city.name]
-    );
+    addRowToBucket(placeBuckets, city.name, row);
+    addRowToBucket(placeBuckets, cityWithoutArticle, row);
+    addRowToBucket(placeBuckets, governorateName, row);
+    addRowToBucket(countryBuckets, country, row);
   });
 
-  Object.entries(GOVERNORATES_BY_COUNTRY).forEach(([country, cities]) => {
-    cities.forEach((city) => addOption(options, optionByKey, country, city));
-  });
-
-  return options.sort((a, b) => a.label.localeCompare(b.label));
+  return { countryBuckets, placeBuckets };
 };
 
-function getAllLocationOptions() {
-  if (!cachedLocationOptions) {
-    cachedLocationOptions = buildLocationOptions();
+function getLocationSearchIndex() {
+  if (!cachedLocationSearchIndex) {
+    cachedLocationSearchIndex = buildLocationSearchIndex();
   }
 
-  return cachedLocationOptions;
+  return cachedLocationSearchIndex;
+}
+
+export function preloadLocationSearchOptions() {
+  getLocationSearchIndex();
 }
 
 export function formatLocationOption({ country = "", governorate = "" } = {}) {
@@ -193,7 +226,7 @@ const scoreOption = (option, queryKey) => {
   return 99;
 };
 
-const includeCurrentOption = (options, currentLocation) => {
+const includeCurrentOption = (options, currentLocation, queryKey) => {
   const currentCountry = trimValue(currentLocation?.country);
   const currentGovernorate = trimValue(currentLocation?.governorate);
 
@@ -202,40 +235,13 @@ const includeCurrentOption = (options, currentLocation) => {
   }
 
   const currentOption = buildOption(currentCountry, currentGovernorate);
+  if (scoreOption(currentOption, queryKey) === 99) {
+    return options;
+  }
+
   const hasCurrent = options.some((option) => option.key === currentOption.key);
 
   return hasCurrent ? options : [currentOption, ...options];
-};
-
-const collectSearchOptions = (options, queryKey, matches, limit) => {
-  const buckets = [[], [], [], [], [], [], []];
-  let found = 0;
-
-  options.forEach((option) => {
-    if (!matches(option)) {
-      return;
-    }
-
-    found += 1;
-    const featuredCountries = FEATURED_CITY_COUNTRIES[queryKey] || [];
-    const isFeaturedExactCity =
-      option.searchKeys.includes(queryKey) &&
-      featuredCountries.some(
-        (country) => normalizeLocationKey(country) === option.countryKey
-      );
-    const score = isFeaturedExactCity
-      ? 0
-      : Math.min(scoreOption(option, queryKey) + 1, buckets.length - 1);
-
-    if (buckets[score].length < limit) {
-      buckets[score].push(option);
-    }
-  });
-
-  return {
-    found,
-    options: buckets.flat().slice(0, limit),
-  };
 };
 
 export function getLocationSearchOptions(
@@ -248,24 +254,70 @@ export function getLocationSearchOptions(
     return [];
   }
 
-  const options = includeCurrentOption(getAllLocationOptions(), currentLocation);
+  const { countryBuckets, placeBuckets } = getLocationSearchIndex();
+  const searchPrefix = queryKey.slice(0, Math.min(2, queryKey.length));
+  const candidateRows = [
+    ...(placeBuckets.get(searchPrefix) || []).slice(0, 800),
+    ...(countryBuckets.get(searchPrefix) || []).slice(0, 400),
+  ];
+  const options = [];
+  const optionByKey = new Map();
+  const seenCities = new Set();
 
-  const cityMatches = collectSearchOptions(
-    options,
-    queryKey,
-    (option) => option.searchKeys.some((key) => key.includes(queryKey)),
-    limit
-  );
+  Object.entries(GOVERNORATES_BY_COUNTRY).forEach(([country, cities]) => {
+    cities.forEach((city) => addOption(options, optionByKey, country, city));
+  });
 
-  if (cityMatches.found) {
-    return cityMatches.options;
-  }
+  candidateRows.forEach((row) => {
+    if (seenCities.has(row.city)) return;
+    seenCities.add(row.city);
+    const rowSearchKeys = [
+      row.city.name,
+      trimValue(row.city.name).replace(LEADING_ARTICLE_PATTERN, "").trim(),
+      row.governorate,
+      row.country,
+    ].map(normalizeLocationKey);
 
-  return collectSearchOptions(
-    options,
-    queryKey,
-    (option) =>
-      option.countryKey.includes(queryKey) || option.labelKey.includes(queryKey),
-    limit
-  ).options;
+    if (!rowSearchKeys.some((key) => key.startsWith(queryKey))) {
+      return;
+    }
+
+    addOption(
+      options,
+      optionByKey,
+      row.country,
+      row.governorate,
+      [row.city.name]
+    );
+  });
+
+  const featuredCountries = FEATURED_CITY_COUNTRIES[queryKey] || [];
+
+  return includeCurrentOption(options, currentLocation, queryKey)
+    .map((option) => {
+      const isFeaturedExactCity =
+        option.searchKeys.includes(queryKey) &&
+        featuredCountries.some(
+          (country) => normalizeLocationKey(country) === option.countryKey
+        );
+
+      const baseScore = isFeaturedExactCity ? -1 : scoreOption(option, queryKey);
+      const isCuratedPrefixMatch =
+        CURATED_LOCATION_KEYS.has(option.key) &&
+        (option.cityKey.startsWith(queryKey) ||
+          option.countryKey.startsWith(queryKey) ||
+          option.searchKeys.some((key) => key.startsWith(queryKey)));
+
+      return {
+        option,
+        score: baseScore < 99 && isCuratedPrefixMatch ? baseScore - 20 : baseScore,
+      };
+    })
+    .filter((item) => item.score < 99)
+    .sort(
+      (a, b) =>
+        a.score - b.score || a.option.label.localeCompare(b.option.label)
+    )
+    .slice(0, limit)
+    .map((item) => item.option);
 }

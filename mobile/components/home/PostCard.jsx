@@ -68,19 +68,22 @@ const CATEGORY_STYLES = {
 };
 
 const STATUS_STYLES = {
-  pending: {
-    backgroundColor: "#FFF4E6",
-    textColor: "#E28A1A",
-  },
-  active: {
+  published: {
     backgroundColor: "#EAF7EE",
     textColor: "#2A9448",
   },
-  closed: {
-    backgroundColor: "#F0F1F2",
-    textColor: "#788089",
+  blocked: {
+    backgroundColor: "#FCEAEA",
+    textColor: "#B43D3D",
   },
 };
+
+function normalizePostStatus(status) {
+  const value = String(status || "published").toLowerCase();
+  return ["blocked", "rejected", "archived"].includes(value)
+    ? "blocked"
+    : "published";
+}
 
 function getCategoryMeta(type) {
   const normalized = String(type || "general")
@@ -95,11 +98,11 @@ function getCategoryMeta(type) {
 }
 
 function getStatusMeta(status) {
-  return STATUS_STYLES[(status || "pending").toLowerCase()] || STATUS_STYLES.pending;
+  return STATUS_STYLES[normalizePostStatus(status)];
 }
 
 function formatStatusLabel(status) {
-  const value = status || "Pending";
+  const value = normalizePostStatus(status);
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
@@ -156,6 +159,13 @@ function getDisplayName(user) {
   return full || user?.email || "Unknown";
 }
 
+function getPostImageUri(post) {
+  const image = post?.image || (Array.isArray(post?.images) ? post.images[0] : null);
+
+  if (typeof image === "string") return image;
+  return image?.url || image?.uri || "";
+}
+
 export default function PostCard({ post, inGroupedSection = false }) {
   const { user } = useUser();
   const categoryMeta = getCategoryMeta(post.type);
@@ -164,6 +174,7 @@ export default function PostCard({ post, inGroupedSection = false }) {
   const isVeterinaryAuthor = isVeterinaryUser(post?.user);
   const petType = post.pet_type || post.petType || "Unknown";
   const postId = post?._id || post?.id;
+  const postImageUri = getPostImageUri(post);
   const authorId = useMemo(() => getEntityId(post?.user), [post?.user]);
   const userId = useMemo(
     () => user?._id || user?.id || user?.$id || null,
@@ -286,8 +297,12 @@ export default function PostCard({ post, inGroupedSection = false }) {
         ]}
       >
         <View style={styles.imageWrapper}>
-          {!!post.image ? (
-            <Image source={{ uri: post.image }} style={styles.image} />
+          {!!postImageUri ? (
+            <Image
+              source={{ uri: postImageUri }}
+              style={styles.image}
+              resizeMode="contain"
+            />
           ) : (
             <View style={styles.imagePlaceholder}>
               <MaterialCommunityIcons name="paw" size={42} color="#C5D9CC" />
@@ -357,16 +372,6 @@ export default function PostCard({ post, inGroupedSection = false }) {
               {petType}
             </ThemedText>
           </View>
-
-          {!!post.description && (
-            <ThemedText
-              style={styles.description}
-              numberOfLines={2}
-              ellipsizeMode="tail"
-            >
-              {post.description}
-            </ThemedText>
-          )}
 
           {!!formatLocation() && (
             <View style={styles.detailRow}>
@@ -482,6 +487,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 232,
     borderRadius: 16,
+    backgroundColor: "#F2F7F4",
   },
   imagePlaceholder: {
     width: "100%",
@@ -572,13 +578,6 @@ const styles = StyleSheet.create({
   },
   detailValue: {
     fontSize: 14,
-  },
-  description: {
-    color: "#4D5551",
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 1,
-    marginBottom: 7,
   },
   locationText: {
     marginLeft: 8,

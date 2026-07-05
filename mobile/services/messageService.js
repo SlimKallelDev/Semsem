@@ -1,10 +1,6 @@
-import axios from "axios";
-import API_BASE_URL from "./api";
+import { createApiClient } from "./api";
 
-const API = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 30000,
-});
+const API = createApiClient();
 
 export const startConversation = async ({ user1, user2, petId }) => {
   const response = await API.post("/messages/start", {

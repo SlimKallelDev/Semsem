@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const authMiddleware = require("../middlewares/authMiddleware");
 
 const {
   startConversation,
@@ -7,6 +8,8 @@ const {
   getMessagesByConversation,
   deleteMessage,
 } = require("../controllers/messageController");
+
+router.use(authMiddleware);
 
 router.post("/start", startConversation);
 router.post("/", sendMessage);

@@ -1,6 +1,8 @@
-const Message = require("../models/message");
+const Message = require("../models/Message");
 const Conversation = require("../models/Conversation");
+const User = require("../models/User");
 const { createNotification } = require("../services/notificationService");
+const { USER_STATUS } = require("../constants/moderationStatuses");
 
 const startConversation = async (req, res, next) => {
   try {
@@ -14,6 +16,21 @@ const startConversation = async (req, res, next) => {
       return res
         .status(400)
         .json({ message: "You cannot start a conversation with yourself" });
+    }
+
+    const currentUserId = String(req.user.userId);
+    const participantIds = [String(user1), String(user2)];
+    if (!participantIds.includes(currentUserId)) {
+      return res.status(403).json({ message: "Not authorized for this conversation" });
+    }
+
+    const otherUserId = participantIds.find((id) => id !== currentUserId);
+    const otherUser = await User.exists({
+      _id: otherUserId,
+      status: USER_STATUS.ACTIVE,
+    });
+    if (!otherUser) {
+      return res.status(404).json({ message: "User not found" });
     }
 
     let conversation = await Conversation.findOne({
@@ -52,17 +69,26 @@ const startConversation = async (req, res, next) => {
 
 const sendMessage = async (req, res, next) => {
   try {
-    const { conversation, sender, text } = req.body;
+    const { conversation, text } = req.body;
+    const sender = req.user.userId;
 
-    if (!conversation || !sender || !text?.trim()) {
+    if (!conversation || !text?.trim()) {
       return res
         .status(400)
-        .json({ message: "conversation, sender and text are required" });
+        .json({ message: "conversation and text are required" });
     }
 
     const conversationExists = await Conversation.findById(conversation);
     if (!conversationExists) {
       return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    if (
+      !conversationExists.participants.some(
+        (participantId) => String(participantId) === String(sender)
+      )
+    ) {
+      return res.status(403).json({ message: "Not authorized for this conversation" });
     }
 
     const message = await Message.create({
@@ -124,6 +150,14 @@ const sendMessage = async (req, res, next) => {
 const getMessagesByConversation = async (req, res, next) => {
   try {
     const { conversationId } = req.params;
+    const conversation = await Conversation.findOne({
+      _id: conversationId,
+      participants: req.user.userId,
+    }).select("_id");
+
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
 
     const messages = await Message.find({ conversation: conversationId })
       .populate("sender", "_id name email avatar image")
@@ -138,11 +172,17 @@ const getMessagesByConversation = async (req, res, next) => {
 
 const deleteMessage = async (req, res, next) => {
   try {
-    const message = await Message.findByIdAndDelete(req.params.id);
+    const message = await Message.findById(req.params.id);
 
     if (!message) {
       return res.status(404).json({ message: "Message not found" });
     }
+
+    if (String(message.sender) !== String(req.user.userId)) {
+      return res.status(403).json({ message: "Not authorized to delete this message" });
+    }
+
+    await message.deleteOne();
 
     const lastMessage = await Message.findOne({
       conversation: message.conversation,

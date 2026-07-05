@@ -236,12 +236,13 @@ export default function ServicesDirectory({ selectedType = "all" }) {
     const isChatStarting = chatStartingId && String(chatStartingId) === String(providerId);
     return (
       <View style={styles.providerCard}>
-        <View style={styles.providerTop}>
-          <TouchableOpacity
-            activeOpacity={0.88}
-            onPress={() => handleOpenProfile(item)}
-            style={styles.avatarButton}
-          >
+        <TouchableOpacity
+          style={styles.providerTop}
+          activeOpacity={0.86}
+          disabled={!providerId}
+          onPress={() => handleOpenProfile(item)}
+        >
+          <View style={styles.avatarButton}>
             <Image source={{ uri: avatarUri }} style={styles.avatar} />
             <View style={styles.avatarBadge}>
               <MaterialCommunityIcons
@@ -250,7 +251,7 @@ export default function ServicesDirectory({ selectedType = "all" }) {
                 color="#FFFFFF"
               />
             </View>
-          </TouchableOpacity>
+          </View>
 
           <View style={styles.providerInfo}>
             <ThemedText style={styles.providerName} numberOfLines={1}>
@@ -269,7 +270,7 @@ export default function ServicesDirectory({ selectedType = "all" }) {
               </View>
             )}
           </View>
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.serviceTagRow}>
           <View style={styles.serviceTag}>

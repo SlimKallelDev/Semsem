@@ -3,6 +3,10 @@ const {
   USER_PROFILE_TYPE_VALUES,
   DEFAULT_USER_PROFILE_TYPE,
 } = require("../constants/profileTypes");
+const {
+  USER_STATUS,
+  USER_STATUS_VALUES,
+} = require("../constants/moderationStatuses");
 
 const userSchema = new mongoose.Schema(
   {
@@ -28,8 +32,8 @@ const userSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["active", "suspended", "banned", "pending"],
-      default: "active",
+      enum: USER_STATUS_VALUES,
+      default: USER_STATUS.ACTIVE,
       index: true,
     },
 

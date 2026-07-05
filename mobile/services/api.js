@@ -1,12 +1,45 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
 import Constants from "expo-constants";
 import { emitAuthExpired } from "./authEvents";
 
-const DEFAULT_LOCAL_HOST = "172.20.10.4";
+const DEFAULT_LOCAL_HOST = "192.168.1.20";
 const DEFAULT_API_PORT = "5000";
 const REQUEST_TIMEOUT_MS = 20000;
 const MAX_RETRIES = 1;
 let authExpiredNotified = false;
+
+const isAuthenticationError = (status, message) => {
+  const normalizedMessage = String(message || "").toLowerCase();
+
+  return (
+    status === 401 ||
+    (status === 403 && normalizedMessage.includes("blocked by an administrator")) ||
+    normalizedMessage.includes("jwt expired") ||
+    normalizedMessage.includes("invalid token") ||
+    normalizedMessage.includes("unauthorized")
+  );
+};
+
+const clearExpiredSession = async (apiMessage = "") => {
+  await AsyncStorage.multiRemove(["token", "user"]);
+
+  if (!authExpiredNotified) {
+    authExpiredNotified = true;
+    const isBlocked = String(apiMessage)
+      .toLowerCase()
+      .includes("blocked by an administrator");
+    emitAuthExpired(
+      isBlocked
+        ? "Your account has been blocked by an administrator."
+        : "Session expired. Please login again."
+    );
+  }
+};
+
+export const resetAuthExpiredNotice = () => {
+  authExpiredNotified = false;
+};
 
 const normalizeBaseUrl = (url) => {
   const value = String(url || "").trim();
@@ -75,22 +108,23 @@ const fetchWithTimeout = async (url, config, timeoutMs) => {
 
 export const request = async (endpoint, options = {}) => {
   let attempt = 0;
+  const { skipAuth = false, ...requestOptions } = options;
 
   while (attempt <= MAX_RETRIES) {
     try {
-      const token = await AsyncStorage.getItem("token");
+      const token = skipAuth ? null : await AsyncStorage.getItem("token");
       const isFormData =
-        typeof FormData !== "undefined" && options.body instanceof FormData;
+        typeof FormData !== "undefined" && requestOptions.body instanceof FormData;
 
       const headers = {
         ...(isFormData ? {} : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(options.headers || {}),
+        ...(requestOptions.headers || {}),
       };
 
       const response = await fetchWithTimeout(
         `${API_BASE_URL}${endpoint}`,
-        { ...options, headers },
+        { ...requestOptions, headers },
         REQUEST_TIMEOUT_MS
       );
 
@@ -104,34 +138,25 @@ export const request = async (endpoint, options = {}) => {
 
       if (!response.ok) {
         const apiMessage = data?.message || data?.error || "Request failed";
-        const isUnauthorized =
-          response.status === 401 ||
-          String(apiMessage).toLowerCase().includes("jwt expired") ||
-          String(apiMessage).toLowerCase().includes("invalid token") ||
-          String(apiMessage).toLowerCase().includes("unauthorized");
+        const isUnauthorized = isAuthenticationError(response.status, apiMessage);
 
-        if (isUnauthorized) {
-          await AsyncStorage.multiRemove(["token", "user"]);
-
-          if (!authExpiredNotified) {
-            authExpiredNotified = true;
-            emitAuthExpired("Session expired. Please login again.");
-          }
+        if (isUnauthorized && token) {
+          await clearExpiredSession(apiMessage);
         }
 
         console.log("API ERROR:", {
           endpoint,
           status: response.status,
-          data,
+          message: apiMessage,
           baseURL: API_BASE_URL,
         });
 
         const error = new Error(apiMessage);
         error.status = response.status;
+        error.isHttpError = true;
         throw error;
       }
 
-      authExpiredNotified = false;
       return data;
     } catch (error) {
       const message = String(error?.message || "");
@@ -145,13 +170,73 @@ export const request = async (endpoint, options = {}) => {
         continue;
       }
 
-      console.log("NETWORK ERROR:", error.message, {
-        endpoint,
-        baseURL: API_BASE_URL,
-      });
+      if (!error?.isHttpError) {
+        console.log("NETWORK ERROR:", error.message, {
+          endpoint,
+          baseURL: API_BASE_URL,
+        });
+      }
       throw error;
     }
   }
+};
+
+export const createApiClient = ({ timeout = REQUEST_TIMEOUT_MS } = {}) => {
+  const client = axios.create({
+    baseURL: API_BASE_URL,
+    timeout,
+  });
+
+  client.interceptors.request.use(
+    async (config) => {
+      const token = await AsyncStorage.getItem("token");
+
+      if (token) {
+        config.headers = {
+          ...config.headers,
+          Authorization: `Bearer ${token}`,
+        };
+      } else if (config.headers) {
+        delete config.headers.Authorization;
+        delete config.headers.authorization;
+      }
+
+      return config;
+    },
+    (error) => Promise.reject(error)
+  );
+
+  client.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      const status = error?.response?.status;
+      const apiMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message;
+      const authorization = error?.config?.headers?.Authorization;
+
+      if (authorization && isAuthenticationError(status, apiMessage)) {
+        await clearExpiredSession(apiMessage);
+      }
+
+      const config = error?.config;
+      const isRetryableGet =
+        config &&
+        String(config.method || "get").toLowerCase() === "get" &&
+        !error?.response &&
+        !config.__semsemRetried;
+
+      if (isRetryableGet) {
+        config.__semsemRetried = true;
+        return client.request(config);
+      }
+
+      return Promise.reject(error);
+    }
+  );
+
+  return client;
 };
 
 export default API_BASE_URL;

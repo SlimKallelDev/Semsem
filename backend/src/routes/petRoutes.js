@@ -24,8 +24,8 @@ router.get("/:id/care-record", getPetCareRecord);
 router.get("/:id/care-record/qr", getPetCareRecordQrData);
 router.put("/:id/care-record", authMiddleware, updatePetCareRecord);
 router.get("/:id", getPetById);
-router.post("/", uploadPetImage, createPet);
-router.put("/:id", uploadPetImage, updatePet);
-router.delete("/:id", deletePet);
+router.post("/", authMiddleware, uploadPetImage, createPet);
+router.put("/:id", authMiddleware, uploadPetImage, updatePet);
+router.delete("/:id", authMiddleware, deletePet);
 
 module.exports = router;

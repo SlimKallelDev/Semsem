@@ -3,11 +3,11 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const env = require("../config/env");
 const {
-  USER_PROFILE_TYPES,
   isPublicProfileType,
   normalizeProfileType,
   resolveUserProfileType,
 } = require("../constants/profileTypes");
+const { USER_STATUS } = require("../constants/moderationStatuses");
 
 const normalizeRatingAverage = (value) => {
   const parsed = Number(value);
@@ -36,6 +36,8 @@ const toUserPayload = (user) => ({
   _id: user._id,
   name: user.name,
   email: user.email,
+  role: user.role || "user",
+  status: user.status || USER_STATUS.ACTIVE,
   governorate: user.governorate || user.city || "",
   country: user.country,
   phone: user.phone,
@@ -81,11 +83,7 @@ const register = async (req, res, next) => {
 
     if (!isPublicProfileType(normalizedProfileType)) {
       res.status(400);
-      throw new Error(
-        normalizedProfileType === USER_PROFILE_TYPES.ADMIN
-          ? "Admin profile type can only be assigned manually"
-          : "Invalid profile type"
-      );
+      throw new Error("Invalid profile type");
     }
 
     const existingUser = await User.findOne({ email: normalizedEmail });
@@ -104,6 +102,7 @@ const register = async (req, res, next) => {
       governorate: normalizedGovernorate,
       city: normalizedGovernorate,
       country: normalizedCountry,
+      status: USER_STATUS.ACTIVE,
     });
 
     const token = generateToken(user._id);
@@ -139,6 +138,11 @@ const login = async (req, res, next) => {
     if (!isMatch) {
       res.status(400);
       throw new Error("Invalid credentials");
+    }
+
+    if (user.status !== USER_STATUS.ACTIVE) {
+      res.status(403);
+      throw new Error("This account has been blocked by an administrator");
     }
 
     const resolvedProfileType = resolveUserProfileType(user.profileType);

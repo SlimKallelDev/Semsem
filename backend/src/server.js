@@ -5,6 +5,9 @@ const { initSocket } = require("./socket");
 const {
   applyDefaultProfileTypeToExistingUsers,
 } = require("./services/profileTypeService");
+const {
+  applyModerationStatusesToExistingData,
+} = require("./services/moderationStatusService");
 
 // FIX DNS Windows
 dns.setServers(["1.1.1.1", "1.0.0.1", "8.8.8.8", "8.8.4.4"]);
@@ -16,6 +19,7 @@ const startServer = async () => {
   try {
     await connectDB();
     await applyDefaultProfileTypeToExistingUsers();
+    await applyModerationStatusesToExistingData();
 
     const PORT = env.PORT || 5000;
     const server = http.createServer(app);

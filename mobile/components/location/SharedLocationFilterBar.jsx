@@ -311,6 +311,7 @@ export default function SharedLocationFilterBar() {
                 placeholderTextColor="#97A29B"
                 value={locationSearch}
                 onChangeText={setLocationSearch}
+                autoFocus
                 autoCapitalize="words"
                 autoCorrect={false}
               />

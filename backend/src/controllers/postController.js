@@ -9,6 +9,10 @@ const {
   normalizePostType,
 } = require("../constants/postTypes");
 const { USER_PUBLIC_FIELDS } = require("../constants/userPublicFields");
+const {
+  POST_STATUS,
+  USER_STATUS,
+} = require("../constants/moderationStatuses");
 
 const HTTP_URL_PATTERN = /^https?:\/\//i;
 const POST_IMAGE_MIN_CREATE = 0;
@@ -305,6 +309,15 @@ const getAuthorProfileType = async (userId) => {
   return author.profileType;
 };
 
+const getActiveUserIds = () =>
+  User.find({ status: USER_STATUS.ACTIVE }).distinct("_id");
+
+const buildVisiblePostFilter = async (query = {}) => ({
+  ...buildPostLocationFilter(query),
+  status: POST_STATUS.PUBLISHED,
+  user: { $in: await getActiveUserIds() },
+});
+
 const createPost = async (req, res, next) => {
   try {
     const { type, title, description, pet_type, location, price, currency } = req.body;
@@ -366,6 +379,7 @@ const createPost = async (req, res, next) => {
       price: saleDetails.price,
       currency: saleDetails.currency,
       location: normalizedLocation,
+      status: POST_STATUS.PUBLISHED,
     };
 
     const post = await Post.create(postPayload);
@@ -384,7 +398,7 @@ const createPost = async (req, res, next) => {
 
 const getPosts = async (req, res, next) => {
   try {
-    const filter = buildPostLocationFilter(req.query);
+    const filter = await buildVisiblePostFilter(req.query);
 
     const posts = await Post.find(filter)
       .populate("user", USER_PUBLIC_FIELDS)
@@ -399,10 +413,12 @@ const getPosts = async (req, res, next) => {
 
 const getPostById = async (req, res, next) => {
   try {
-    const post = await Post.findById(req.params.id).populate(
-      "user",
-      USER_PUBLIC_FIELDS
-    );
+    const activeUserIds = await getActiveUserIds();
+    const post = await Post.findOne({
+      _id: req.params.id,
+      status: POST_STATUS.PUBLISHED,
+      user: { $in: activeUserIds },
+    }).populate("user", USER_PUBLIC_FIELDS);
 
     if (!post) {
       return res.status(404).json({ message: "Post not found" });
@@ -417,7 +433,32 @@ const getPostById = async (req, res, next) => {
 
 const getPostsByUser = async (req, res, next) => {
   try {
-    const posts = await Post.find({ user: req.params.userId })
+    const activeUser = await User.exists({
+      _id: req.params.userId,
+      status: USER_STATUS.ACTIVE,
+    });
+
+    if (!activeUser) {
+      return res.status(200).json([]);
+    }
+
+    const posts = await Post.find({
+      user: req.params.userId,
+      status: POST_STATUS.PUBLISHED,
+    })
+      .populate("user", USER_PUBLIC_FIELDS)
+      .sort({ createdAt: -1 });
+
+    posts.forEach(hydratePostImages);
+    res.status(200).json(posts);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getMyPosts = async (req, res, next) => {
+  try {
+    const posts = await Post.find({ user: req.user.userId })
       .populate("user", USER_PUBLIC_FIELDS)
       .sort({ createdAt: -1 });
 
@@ -541,6 +582,7 @@ module.exports = {
   getPosts,
   getPostById,
   getPostsByUser,
+  getMyPosts,
   updatePost,
   deletePost,
 };

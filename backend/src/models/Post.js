@@ -1,5 +1,9 @@
 const mongoose = require("mongoose");
 const { POST_TYPE_VALUES } = require("../constants/postTypes");
+const {
+  POST_STATUS,
+  POST_STATUS_VALUES,
+} = require("../constants/moderationStatuses");
 
 const postSchema = new mongoose.Schema(
   {
@@ -85,8 +89,8 @@ const postSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected", "archived"],
-      default: "pending",
+      enum: POST_STATUS_VALUES,
+      default: POST_STATUS.PUBLISHED,
       index: true,
     },
 

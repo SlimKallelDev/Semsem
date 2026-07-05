@@ -1,12 +1,26 @@
 // mobile/app/_layout.jsx
 import { Stack } from "expo-router";
+import { useEffect } from "react";
 import { Image, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { UserProvider } from "../contexts/UserContext";
 import { useUser } from "../contexts/UserContext";
+import { preloadLocationSearchOptions } from "../constants/locationOptions";
 
 function AppBootstrap() {
   const { initializing } = useUser();
+
+  useEffect(() => {
+    const preloadTimer = setTimeout(() => {
+      try {
+        preloadLocationSearchOptions();
+      } catch (error) {
+        console.log("Location search preload error:", error?.message || error);
+      }
+    }, 250);
+
+    return () => clearTimeout(preloadTimer);
+  }, []);
 
   if (initializing) {
     return (

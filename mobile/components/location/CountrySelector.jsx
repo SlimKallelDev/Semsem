@@ -35,9 +35,15 @@ export default function CountrySelector({
     const query = search.trim().toLowerCase();
     if (!query) return COUNTRIES;
 
-    return COUNTRIES.filter((country) =>
-      country.toLowerCase().includes(query)
+    const startsWith = COUNTRIES.filter((country) =>
+      country.toLowerCase().startsWith(query)
     );
+    const contains = COUNTRIES.filter((country) => {
+      const key = country.toLowerCase();
+      return !key.startsWith(query) && key.includes(query);
+    });
+
+    return [...startsWith, ...contains];
   }, [search]);
 
   const handleSelect = (country) => {
@@ -102,6 +108,7 @@ export default function CountrySelector({
                 placeholderTextColor="#94A19A"
                 value={search}
                 onChangeText={setSearch}
+                autoFocus
                 autoCapitalize="words"
               />
 
