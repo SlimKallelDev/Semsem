@@ -1,23 +1,29 @@
+import { palette } from "./designSystem";
+
 export const Colors = {
-  primary: '#3DB85C',
-  warning: '#cc475a',
+  primary: palette.primary,
+  warning: palette.danger,
 
   dark: {
-    text: '#d4d4d4',
-    title: '#fff',
-    background: '#272726',
-    navBackground: '#201e2b',
-    iconColour: '#9591a5',
-    iconColourFocused: '#fff',
-    uiBackground: '#272726',
+    text: "#D7E0D9",
+    title: "#FFFFFF",
+    background: "#18201B",
+    navBackground: "#111713",
+    iconColour: "#A9B5AC",
+    iconColourFocused: "#FFFFFF",
+    uiBackground: "#222C25",
+    border: "#354239",
+    placeholder: "#8F9B92",
   },
   light: {
-    text: '#625f72',
-    title: '#201e2b',
-    background: '#fefefe',
-    navBackground: '#e8e7ef',
-    iconColour: '#686477',
-    iconColourFocused: '#201e2b',
-    uiBackground: '#fefefe',
-  }
-}
+    text: palette.text,
+    title: palette.ink,
+    background: palette.background,
+    navBackground: palette.surface,
+    iconColour: palette.muted,
+    iconColourFocused: palette.primaryStrong,
+    uiBackground: palette.surface,
+    border: palette.border,
+    placeholder: palette.subtle,
+  },
+};

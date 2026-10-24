@@ -1,194 +1,209 @@
 # Semsem
 
-A full-stack mobile social platform for pet owners and lovers. Users can post about pet adoptions, lost/found animals, mating requests, and general pet content — while also chatting with other users in real time and discovering pets nearby.
+Semsem is a full-stack community and service platform for pet owners, animal
+professionals, shelters, associations, breeders, and pet businesses. The
+repository contains an Expo mobile application, an Express API, and a React
+administration dashboard.
 
----
+## Applications
 
-## Table of Contents
+| Application | Directory | Description |
+| --- | --- | --- |
+| Backend API | `backend/` | Express, MongoDB, Mongoose, JWT, Socket.IO, and Cloudinary |
+| Mobile app | `mobile/` | Expo and React Native application for iOS, Android, and web |
+| Admin dashboard | `web/` | Vite and React dashboard for administration and moderation |
 
-- [Overview](#overview)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Features](#features)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Backend Setup](#backend-setup)
-  - [Mobile Setup](#mobile-setup)
-- [Environment Variables](#environment-variables)
-- [API Overview](#api-overview)
+## Main Features
 
----
+### Mobile
 
-## Overview
+- JWT registration and login with guest and authenticated route protection.
+- User profiles for pet owners and service providers.
+- Post feed with Question, Adoption, Lost, Found, Mating, and Sale filters.
+- Post creation and editing with zero to five optional pictures.
+- Sale posts with a price and selectable currency, displayed on feed cards.
+- Pet profiles, care records, and QR care-record views.
+- Likes, comments, private conversations, and real-time messaging support.
+- Notifications with unread counts and links to related content.
+- Appointments with creation, rescheduling, acceptance, rejection, and
+  cancellation workflows.
+- Activity history for the current user's likes, comments, and appointment
+  actions.
+- Location filtering by country, city, or nearby results.
+- Bottom navigation in this order: Notifications, Messages, Home, Activity,
+  and My Space.
 
-Semsem is a monorepo containing two applications:
+### Administration
 
-| App | Path | Description |
-|-----|------|-------------|
-| **Backend** | `backend/` | Node.js / Express REST API backed by MongoDB |
-| **Mobile** | `mobile/` | Expo / React Native client (iOS, Android, Web) |
-
----
+- Dashboard and usage analytics.
+- User, pet, post, appointment, and report management.
+- Account and content moderation statuses.
+- Post interaction details and report review.
 
 ## Tech Stack
 
 ### Backend
-- **Runtime:** Node.js
-- **Framework:** Express 5
-- **Database:** MongoDB via Mongoose 9
-- **Auth:** JSON Web Tokens (`jsonwebtoken`) + password hashing (`bcryptjs`)
-- **Other:** `cors`, `dotenv`
+
+- Node.js and Express 5
+- MongoDB and Mongoose 9
+- JWT authentication and bcrypt password hashing
+- Socket.IO
+- Cloudinary and Multer
 
 ### Mobile
-- **Framework:** Expo ~54 with New Architecture enabled
-- **Routing:** Expo Router ~6 (file-based)
-- **UI:** React Native 0.81 / React 19
-- **HTTP:** Axios
-- **Storage:** `@react-native-async-storage/async-storage`
-- **Real-time:** `socket.io-client`
-- **Media:** `expo-image-picker`
-- **Icons:** `@expo/vector-icons`
 
----
+- Expo 54 and Expo Router 6
+- React 19 and React Native 0.81
+- Axios and AsyncStorage
+- Expo Image Picker and Expo Location
+- Socket.IO client
+
+### Admin Web
+
+- Vite 6 and React 19
+- Recharts
+- Lucide React icons
 
 ## Project Structure
 
-```
+```text
 Semsem/
-├── backend/
-│   └── src/
-│       ├── server.js              # Entry point — boots Express, connects DB
-│       ├── index.js               # App factory — CORS, JSON, routes, error middleware
-│       ├── config/
-│       │   └── db.js              # Mongoose connection
-│       ├── routes/                # auth, users, pets, posts, comments,
-│       │                          # likes, messages, conversations, notifications
-│       ├── controllers/           # Business logic (one file per domain)
-│       ├── models/                # Mongoose schemas
-│       │   ├── User.js
-│       │   ├── Pet.js
-│       │   ├── Post.js
-│       │   ├── Comment.js
-│       │   ├── Like.js
-│       │   ├── Message.js
-│       │   ├── Conversation.js
-│       │   └── Notification.js
-│       ├── middlewares/           # authMiddleware, validateMiddleware, errorMiddleware
-│       └── services/
-│           └── notificationService.js
-│
-└── mobile/
-    ├── app/
-    │   ├── index.jsx              # Root screen
-    │   ├── _layout.jsx            # Root layout
-    │   ├── (auth)/                # Login & Register screens
-    │   └── (app)/                 # Authenticated tab app
-    │       ├── home/              # Main feed
-    │       ├── meet/              # Pet discovery / "Meet" section
-    │       ├── messages/          # Conversations list + [conversationId] chat
-    │       ├── profile/           # User profile
-    │       ├── myposts/           # User's own posts
-    │       ├── mypets/            # User's own pets
-    │       ├── post/[id]/         # Single post detail
-    │       └── pet/[id]/          # Single pet detail
-    ├── components/                # Shared UI (ThemedButton, PostCard, MeetGrid, …)
-    ├── contexts/                  # UserContext, LocationFilterContext
-    ├── hooks/                     # useUser
-    ├── services/                  # api.js, authService, postService, petService,
-    │                              # socketService, notificationEvents, …
-    └── constants/                 # Colors, countries
+|-- backend/
+|   |-- scripts/             # Administrative scripts
+|   `-- src/
+|       |-- config/          # Database, environment, and Cloudinary setup
+|       |-- constants/       # Profile, post, and moderation values
+|       |-- controllers/     # API business logic
+|       |-- middlewares/     # Authentication, admin, upload, and errors
+|       |-- models/          # Mongoose models
+|       |-- routes/          # REST routes
+|       |-- services/        # Shared backend services
+|       |-- validations/     # Request validation
+|       |-- index.js         # Express application
+|       `-- server.js        # HTTP and Socket.IO server entry point
+|-- mobile/
+|   |-- app/                 # Expo Router screens and layouts
+|   |-- components/          # Shared React Native components
+|   |-- constants/           # Post types, currencies, locations, and colors
+|   |-- contexts/            # User and location state
+|   `-- services/            # API, auth, post, pet, message, and activity data
+|-- web/
+|   |-- public/              # Static assets
+|   `-- src/                 # Admin dashboard application
+|-- .gitignore
+`-- README.md
 ```
-
----
-
-## Features
-
-- **Authentication** — Register/login with JWT-protected routes; guest and authenticated-only route guards.
-- **Posts & Feed** — Create, browse, and filter posts by type: `adoption`, `lost`, `found`, `mating`, or `general`. Supports images and pet metadata.
-- **Pets** — Full CRUD for a user's pet profiles with breed, type, and photo support.
-- **Social** — Comment on and like posts.
-- **Messaging** — Private conversations between users with a real-time-ready chat screen.
-- **Notifications** — In-app notification sheet with unread counts and mark-as-read.
-- **Discovery ("Meet")** — Browse pets by location with a shared location filter across screens.
-- **Location Filtering** — Filter content by country and city through a global context.
-
----
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js ≥ 18
-- npm ≥ 9
-- A running MongoDB instance (local or Atlas)
-- Expo CLI (`npm install -g expo-cli`) or use `npx expo`
+- Node.js 18 or newer
+- npm 9 or newer
+- MongoDB, either local or MongoDB Atlas
+- A Cloudinary account when image uploads are required
+- Expo Go or a native simulator for mobile testing
 
-### Backend Setup
+### 1. Backend
 
 ```bash
 cd backend
 npm install
 ```
 
-Create a `.env` file in `backend/` (see [Environment Variables](#environment-variables)), then:
+Create `backend/.env`:
 
-```bash
-# Development (auto-restarts with nodemon)
-npm run dev
+```dotenv
+MONGO_URI=mongodb://127.0.0.1:27017/semsem
+JWT_SECRET=replace-with-a-secure-secret
+JWT_EXPIRES_IN=7d
+PORT=5000
 
-# Production
-npm start
+# Use CLOUDINARY_URL, or provide the three separate values below.
+CLOUDINARY_URL=
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
 ```
 
-The server listens on the port defined in your `.env` (default `5000`).
+Start the API:
 
-### Mobile Setup
+```bash
+npm run dev
+```
+
+Create or update an administrator account:
+
+```bash
+npm run create-admin -- "admin@example.com" "strong-password" "Admin Name"
+```
+
+### 2. Mobile
 
 ```bash
 cd mobile
 npm install
 ```
 
-Update the API base URL in `mobile/services/api.js` to point to your running backend, then:
+Optionally create `mobile/.env` to override automatic local API discovery:
 
-```bash
-# Start Expo development server
-npx expo start
-
-# Target a specific platform
-npx expo start --android
-npx expo start --ios
-npx expo start --web
+```dotenv
+EXPO_PUBLIC_API_URL=http://YOUR_LOCAL_IP:5000
 ```
 
----
+Start Expo:
 
-## Environment Variables
+```bash
+npm start
+```
 
-Create `backend/.env` with the following keys:
+Other available commands are `npm run android`, `npm run ios`, and
+`npm run web`.
 
-| Variable | Description |
-|----------|-------------|
-| `MONGO_URI` | MongoDB connection string |
-| `JWT_SECRET` | Secret used to sign JWT tokens |
-| `PORT` | Port the server listens on (default `5000`) |
+### 3. Admin Dashboard
 
----
+```bash
+cd web
+npm install
+```
+
+Optionally create `web/.env`:
+
+```dotenv
+VITE_API_URL=http://localhost:5000/api
+```
+
+Start the dashboard:
+
+```bash
+npm run dev
+```
+
+The Vite development server uses `http://localhost:5173` by default.
 
 ## API Overview
 
-All routes are prefixed with `/api`.
+All API routes are prefixed with `/api`.
 
-| Prefix | Description |
-|--------|-------------|
-| `/api/auth` | Register, login |
-| `/api/users` | User profiles |
-| `/api/pets` | Pet CRUD |
-| `/api/posts` | Post CRUD + filtering |
-| `/api/comments` | Comments on posts |
-| `/api/likes` | Like/unlike posts |
-| `/api/messages` | Individual messages |
-| `/api/conversations` | Conversation threads |
-| `/api/notifications` | Notification list + mark-read |
+| Prefix | Purpose |
+| --- | --- |
+| `/api/auth` | Registration and login |
+| `/api/users` | Profiles and provider reviews |
+| `/api/pets` | Pet profiles and care records |
+| `/api/posts` | Posts, filters, and reports |
+| `/api/comments` | Post comments and current-user comment history |
+| `/api/likes` | Likes and current-user like history |
+| `/api/messages` | Messages and conversation creation |
+| `/api/conversations` | Conversation lists and details |
+| `/api/notifications` | Notifications and unread state |
+| `/api/appointments` | Appointment creation and updates |
+| `/api/locations` | Location suggestions |
+| `/api/admin` | Protected administration endpoints |
 
-Protected routes require a `Bearer <token>` header supplied by the mobile client after login.
+Protected endpoints require an `Authorization: Bearer <token>` header.
+
+## Local Files
+
+Environment files, dependencies, build output, logs, and the repository-level
+`tmp/` directory are ignored by Git. Files placed in `tmp/` will not be
+included when pushing the repository to GitHub.

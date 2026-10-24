@@ -8,17 +8,43 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
 import ThemedText from "../../components/ThemedText";
 import ThemedView from "../../components/ThemedView";
-import Spacer from "../../components/Spacer";
+import {
+  palette,
+  radii,
+  shadows,
+} from "../../constants/designSystem";
+import { formatUserTypeRatingWithCount } from "../../constants/userDisplay";
 import { useUser } from "../../contexts/UserContext";
 import { getUserConversations } from "../../services/messageService";
 
+const getEntityId = (value) => {
+  if (!value) return null;
+  if (typeof value === "string" || typeof value === "number") return value;
+  return value?._id || value?.id || value?.userId || value?.$id || null;
+};
+
+const getDisplayName = (person) => {
+  const explicit = String(
+    person?.name || person?.fullName || person?.username || ""
+  ).trim();
+
+  if (explicit) return explicit;
+
+  const first = String(person?.firstName || "").trim();
+  const last = String(person?.lastName || "").trim();
+  const fullName = [first, last].filter(Boolean).join(" ");
+
+  return fullName || String(person?.email || "Conversation").trim();
+};
+
 export default function MessagesScreen() {
-  const { user } = useUser();
+  const { user, initializing } = useUser();
 
   const userId = useMemo(
     () => user?._id || user?.id || user?.$id || null,
@@ -52,6 +78,12 @@ export default function MessagesScreen() {
     loadConversations();
   }, [loadConversations]);
 
+  useEffect(() => {
+    if (!initializing && !userId) {
+      router.replace("/(auth)/login");
+    }
+  }, [initializing, userId]);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadConversations();
@@ -59,14 +91,16 @@ export default function MessagesScreen() {
 
   const renderConversation = ({ item }) => {
     const otherUser = item?.participants?.find(
-      (participant) => String(participant?._id) !== String(userId)
+      (participant) => String(getEntityId(participant)) !== String(userId)
     );
 
     const avatarUri =
+      otherUser?.avatar ||
       otherUser?.image ||
       "https://via.placeholder.com/100x100.png?text=User";
 
-    const title = otherUser?.name || "Conversation";
+    const title = getDisplayName(otherUser);
+    const profileMeta = formatUserTypeRatingWithCount(otherUser);
     const subtitle = item?.lastMessage?.text || "Start conversation";
 
     return (
@@ -78,7 +112,12 @@ export default function MessagesScreen() {
         <Image source={{ uri: avatarUri }} style={styles.avatar} />
 
         <View style={styles.textContainer}>
-          <ThemedText style={styles.name}>{title}</ThemedText>
+          <ThemedText style={styles.name} numberOfLines={1}>
+            {title}
+          </ThemedText>
+          <ThemedText style={styles.profileMeta} numberOfLines={1}>
+            {profileMeta}
+          </ThemedText>
           <ThemedText style={styles.lastMessage} numberOfLines={1}>
             {subtitle}
           </ThemedText>
@@ -89,7 +128,7 @@ export default function MessagesScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <SafeAreaView style={styles.safeArea} edges={[]}>
         <ThemedView style={styles.center}>
           <ActivityIndicator size="large" />
         </ThemedView>
@@ -97,28 +136,26 @@ export default function MessagesScreen() {
     );
   }
 
-  if (!userId) {
-    return (
-      <SafeAreaView style={styles.safeArea} edges={["top"]}>
-        <ThemedView style={styles.center}>
-          <ThemedText>You need to be logged in to see messages.</ThemedText>
-        </ThemedView>
-      </SafeAreaView>
-    );
-  }
+  if (!userId) return null;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+    <SafeAreaView style={styles.safeArea} edges={[]}>
       <ThemedView style={styles.container}>
-        <ThemedText type="title" style={styles.title}>
-          Messages 💬
-        </ThemedText>
-
-        <ThemedText style={styles.subtitle}>
-          All your conversations with other users
-        </ThemedText>
-
-        <Spacer height={16} />
+        <View style={styles.headerCard}>
+          <View style={styles.headerIcon}>
+            <Ionicons
+              name="chatbubbles-outline"
+              size={27}
+              color={palette.primary}
+            />
+          </View>
+          <View style={styles.headerText}>
+            <ThemedText style={styles.title}>Messages</ThemedText>
+            <ThemedText style={styles.subtitle}>
+              Your conversations with the Semsem community
+            </ThemedText>
+          </View>
+        </View>
 
         <FlatList
           data={conversations}
@@ -134,11 +171,16 @@ export default function MessagesScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <ThemedText style={styles.emptyTitle}>
-                No conversations yet
-              </ThemedText>
+              <View style={styles.emptyIcon}>
+                <Ionicons
+                  name="chatbubble-ellipses-outline"
+                  size={32}
+                  color={palette.primary}
+                />
+              </View>
+              <ThemedText style={styles.emptyTitle}>No conversations yet</ThemedText>
               <ThemedText style={styles.emptyText}>
-                Open a pet profile and tap “Message owner” to start chatting.
+                Open a pet profile and tap "Message" to start chatting.
               </ThemedText>
             </View>
           }
@@ -151,6 +193,7 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    backgroundColor: palette.background,
   },
   container: {
     flex: 1,
@@ -163,43 +206,85 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 24,
   },
+  headerCard: {
+    minHeight: 92,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surface,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+    ...shadows.soft,
+  },
+  headerIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 20,
+    backgroundColor: palette.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+  },
   title: {
-    fontSize: 24,
+    fontSize: 25,
+    fontWeight: "900",
+    color: palette.ink,
   },
   subtitle: {
-    marginTop: 4,
-    opacity: 0.7,
-    fontSize: 14,
+    marginTop: 3,
+    color: palette.muted,
+    fontSize: 13,
+    fontWeight: "700",
   },
   listContent: {
-    paddingBottom: 24,
+    paddingBottom: 4,
   },
   emptyListContent: {
     flexGrow: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
+    paddingTop: 72,
   },
   emptyState: {
     alignItems: "center",
     padding: 24,
   },
+  emptyIcon: {
+    width: 70,
+    height: 70,
+    borderRadius: 26,
+    backgroundColor: palette.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
   emptyTitle: {
     fontSize: 22,
-    fontWeight: "700",
+    fontWeight: "900",
+    color: palette.ink,
     textAlign: "center",
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 15,
-    opacity: 0.7,
+    color: palette.muted,
     textAlign: "center",
   },
   card: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f5f5f5",
-    borderRadius: 16,
-    padding: 12,
+    backgroundColor: palette.surface,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: palette.border,
+    padding: 13,
     marginBottom: 12,
+    ...shadows.soft,
   },
   avatar: {
     width: 58,
@@ -214,6 +299,12 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: "700",
+  },
+  profileMeta: {
+    marginTop: 2,
+    color: "#2D7F43",
+    fontSize: 12.5,
+    fontWeight: "800",
   },
   lastMessage: {
     marginTop: 4,

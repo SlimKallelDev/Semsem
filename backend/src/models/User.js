@@ -1,4 +1,12 @@
 const mongoose = require("mongoose");
+const {
+  USER_PROFILE_TYPE_VALUES,
+  DEFAULT_USER_PROFILE_TYPE,
+} = require("../constants/profileTypes");
+const {
+  USER_STATUS,
+  USER_STATUS_VALUES,
+} = require("../constants/moderationStatuses");
 
 const userSchema = new mongoose.Schema(
   {
@@ -14,10 +22,18 @@ const userSchema = new mongoose.Schema(
       default: "user",
     },
 
+    profileType: {
+      type: String,
+      enum: USER_PROFILE_TYPE_VALUES,
+      default: DEFAULT_USER_PROFILE_TYPE,
+      required: [true, "Profile type is required"],
+      index: true,
+    },
+
     status: {
       type: String,
-      enum: ["active", "suspended", "banned", "pending"],
-      default: "active",
+      enum: USER_STATUS_VALUES,
+      default: USER_STATUS.ACTIVE,
       index: true,
     },
 
@@ -35,6 +51,11 @@ const userSchema = new mongoose.Schema(
       minlength: 6,
     },
 
+    governorate: {
+      type: String,
+      trim: true,
+    },
+    // Legacy field kept for backward compatibility with older records/clients.
     city: {
       type: String,
       trim: true,
@@ -62,8 +83,22 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+
+    ratingAverage: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
+    },
+
+    ratingCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
-  { timestamps: true }
+  { timestamps: true, collection: "users" }
 );
 
 module.exports = mongoose.model("User", userSchema);
+

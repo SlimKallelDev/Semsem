@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   RefreshControl,
@@ -13,10 +14,19 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
 import ThemedText from "../../components/ThemedText";
+import {
+  palette,
+  radii,
+  shadows,
+} from "../../constants/designSystem";
+import { getPostTypeLabel } from "../../constants/postTypes";
 import { useUser } from "../../contexts/UserContext";
-import { getPostsByUser } from "../../services/postService";
+import {
+  getMyPosts,
+  updatePostStatus,
+} from "../../services/postService";
 
-const GREEN = "#3DB85C";
+const GREEN = palette.primary;
 
 function formatDate(value) {
   if (!value) return "";
@@ -35,15 +45,20 @@ function capitalize(str) {
 }
 
 const STATUS_STYLES = {
-  active: { bg: "#E8F8EE", text: GREEN },
-  approved: { bg: "#E8F8EE", text: GREEN },
-  pending: { bg: "#FFF3E0", text: "#E07B00" },
-  rejected: { bg: "#FEECEC", text: "#D63031" },
-  closed: { bg: "#F0F0F0", text: "#888" },
+  published: { bg: "#E8F8EE", text: GREEN },
+  resolved: { bg: "#EAF2FF", text: "#356DB2" },
+  blocked: { bg: "#FEECEC", text: "#D63031" },
 };
 
+function normalizePostStatus(status) {
+  const value = String(status || "published").toLowerCase();
+  if (value === "resolved") return "resolved";
+  if (["blocked", "rejected", "archived"].includes(value)) return "blocked";
+  return "published";
+}
+
 function statusStyle(status) {
-  return STATUS_STYLES[(status || "").toLowerCase()] || { bg: "#F0F0F0", text: "#888" };
+  return STATUS_STYLES[normalizePostStatus(status)];
 }
 
 const TYPE_COLORS = {
@@ -58,7 +73,7 @@ function typeColor(type) {
   return TYPE_COLORS[(type || "").toLowerCase()] || GREEN;
 }
 
-function PostRow({ item }) {
+function PostRow({ item, onStatusChange, statusUpdating }) {
   const postId = item?._id || item?.id;
   const imageUri =
     item?.image ||
@@ -66,13 +81,22 @@ function PostRow({ item }) {
     "https://via.placeholder.com/200x200.png?text=Post";
 
   const sStyle = statusStyle(item?.status);
+  const displayStatus = normalizePostStatus(item?.status);
+  const isBlocked = displayStatus === "blocked";
+  const isResolved = displayStatus === "resolved";
+  const canOpen = displayStatus === "published";
   const tColor = typeColor(item?.type);
 
   return (
     <TouchableOpacity
       activeOpacity={0.88}
-      style={styles.card}
-      onPress={() => postId && router.push(`/post/${postId}`)}
+      style={[
+        styles.card,
+        isBlocked && styles.cardBlocked,
+        isResolved && styles.cardResolved,
+      ]}
+      disabled={isBlocked}
+      onPress={() => canOpen && postId && router.push(`/post/${postId}`)}
     >
       <Image source={{ uri: imageUri }} style={styles.cardImage} />
 
@@ -92,11 +116,11 @@ function PostRow({ item }) {
               ]}
             >
               <ThemedText style={[styles.tagText, { color: tColor }]}>
-                {capitalize(item.type)}
+                {getPostTypeLabel(item.type)}
               </ThemedText>
             </View>
           )}
-          {!!item?.status && (
+          {!!displayStatus && (
             <View
               style={[
                 styles.statusTag,
@@ -104,7 +128,7 @@ function PostRow({ item }) {
               ]}
             >
               <ThemedText style={[styles.statusTagText, { color: sStyle.text }]}>
-                {capitalize(item.status)}
+                {capitalize(displayStatus)}
               </ThemedText>
             </View>
           )}
@@ -115,7 +139,7 @@ function PostRow({ item }) {
           <View style={styles.likesBlock}>
             <Ionicons name="heart" size={13} color="#E05555" />
             <ThemedText style={styles.likesText}>
-              {item?.likes_count || 0} likes
+              {item?.likesCount || 0} likes
             </ThemedText>
           </View>
           <ThemedText style={styles.dateText}>
@@ -125,8 +149,30 @@ function PostRow({ item }) {
       </View>
 
       {/* 3-dot menu */}
-      <TouchableOpacity style={styles.menuBtn} activeOpacity={0.7}>
-        <Ionicons name="ellipsis-vertical" size={18} color="#B0BAB5" />
+      <TouchableOpacity
+        style={styles.menuBtn}
+        activeOpacity={0.7}
+        disabled={isBlocked}
+        onPress={() => onStatusChange?.(item)}
+        hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+      >
+        {statusUpdating ? (
+          <ActivityIndicator size="small" color={GREEN} />
+        ) : (
+          <Ionicons
+            name={
+              isBlocked
+                ? "lock-closed-outline"
+                : isResolved
+                ? "refresh-circle-outline"
+                : "checkmark-circle-outline"
+            }
+            size={22}
+            color={
+              isBlocked ? "#B0BAB5" : isResolved ? "#356DB2" : GREEN
+            }
+          />
+        )}
       </TouchableOpacity>
     </TouchableOpacity>
   );
@@ -135,14 +181,16 @@ function PostRow({ item }) {
 function StatsRow({ posts }) {
   const total = posts.length;
   const active = posts.filter(
-    (p) => (p?.status || "").toLowerCase() === "active" || (p?.status || "").toLowerCase() === "approved"
+    (p) => normalizePostStatus(p?.status) === "published"
   ).length;
-  const likes = posts.reduce((sum, p) => sum + (p?.likes_count || 0), 0);
+  const resolved = posts.filter(
+    (p) => normalizePostStatus(p?.status) === "resolved"
+  ).length;
 
   const stats = [
     { value: total, label: "Total" },
-    { value: active, label: "Active" },
-    { value: likes, label: "Likes" },
+    { value: active, label: "Published" },
+    { value: resolved, label: "Resolved" },
   ];
 
   return (
@@ -157,8 +205,8 @@ function StatsRow({ posts }) {
   );
 }
 
-export default function MyPosts() {
-  const { user } = useUser();
+export default function MyPosts({ embedded = false, onCountChange } = {}) {
+  const { user, initializing } = useUser();
 
   const userId = useMemo(
     () => user?._id || user?.id || user?.$id || null,
@@ -168,32 +216,89 @@ export default function MyPosts() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [statusUpdatingId, setStatusUpdatingId] = useState(null);
 
   const loadMyPosts = useCallback(async () => {
     if (!userId) {
       setPosts([]);
+      onCountChange?.(0);
       setLoading(false);
       setRefreshing(false);
       return;
     }
     try {
-      const data = await getPostsByUser(userId);
-      setPosts(Array.isArray(data) ? data : []);
+      const data = await getMyPosts();
+      const nextPosts = Array.isArray(data) ? data : [];
+      setPosts(nextPosts);
+      onCountChange?.(nextPosts.length);
     } catch (error) {
       console.log("Get my posts error:", error.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [userId]);
+  }, [onCountChange, userId]);
 
   useEffect(() => {
     loadMyPosts();
   }, [loadMyPosts]);
 
+  useEffect(() => {
+    if (!embedded && !initializing && !userId) {
+      router.replace("/(auth)/login");
+    }
+  }, [embedded, initializing, userId]);
+
+  const handleStatusChange = (post) => {
+    const postId = post?._id || post?.id;
+    if (!postId || statusUpdatingId) return;
+
+    const currentStatus = normalizePostStatus(post?.status);
+    const nextStatus =
+      currentStatus === "resolved" ? "published" : "resolved";
+    const resolving = nextStatus === "resolved";
+
+    Alert.alert(
+      resolving ? "Mark as resolved" : "Publish again",
+      resolving
+        ? "This post will no longer appear on the home feed."
+        : "This post will appear on the home feed again.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: resolving ? "Mark resolved" : "Publish",
+          onPress: async () => {
+            try {
+              setStatusUpdatingId(String(postId));
+              const updatedPost = await updatePostStatus(postId, nextStatus);
+              setPosts((current) =>
+                current.map((item) =>
+                  String(item?._id || item?.id) === String(postId)
+                    ? { ...item, ...updatedPost }
+                    : item
+                )
+              );
+            } catch (error) {
+              console.log("Update post status error:", error.message);
+              Alert.alert(
+                "Error",
+                error.message || "Failed to update post status"
+              );
+            } finally {
+              setStatusUpdatingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={["top"]}>
+      <SafeAreaView
+        style={[styles.safe, embedded && styles.embeddedSafe]}
+        edges={[]}
+      >
         <View style={styles.center}>
           <ActivityIndicator size="large" color={GREEN} />
         </View>
@@ -201,22 +306,26 @@ export default function MyPosts() {
     );
   }
 
-  if (!userId) {
-    return (
-      <SafeAreaView style={styles.safe} edges={["top"]}>
-        <View style={styles.center}>
-          <ThemedText>You need to be logged in to see your posts.</ThemedText>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  if (!userId) return null;
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView
+      style={[styles.safe, embedded && styles.embeddedSafe]}
+      edges={[]}
+    >
       <FlatList
         data={posts}
         keyExtractor={(item) => item._id || item.id}
-        renderItem={({ item }) => <PostRow item={item} />}
+        renderItem={({ item }) => (
+          <PostRow
+            item={item}
+            onStatusChange={handleStatusChange}
+            statusUpdating={
+              String(statusUpdatingId || "") ===
+              String(item?._id || item?.id || "")
+            }
+          />
+        )}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -228,11 +337,19 @@ export default function MyPosts() {
             tintColor={GREEN}
           />
         }
-        contentContainerStyle={styles.listContent}
-        ListHeaderComponent={
+        contentContainerStyle={[
+          styles.listContent,
+          embedded && styles.embeddedListContent,
+        ]}
+        ListHeaderComponent={!embedded ? (
           <>
             <View style={styles.pageHeader}>
-              <ThemedText style={styles.pageTitle}>My Posts</ThemedText>
+              <View style={styles.pageHeaderText}>
+                <ThemedText style={styles.pageTitle}>My Posts</ThemedText>
+                <ThemedText style={styles.pageSubtitle}>
+                  Manage published, resolved, and moderated posts
+                </ThemedText>
+              </View>
               <TouchableOpacity
                 style={styles.addBtn}
                 activeOpacity={0.85}
@@ -243,7 +360,7 @@ export default function MyPosts() {
             </View>
             {posts.length > 0 && <StatsRow posts={posts} />}
           </>
-        }
+        ) : null}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="document-text-outline" size={40} color={GREEN} />
@@ -261,7 +378,10 @@ export default function MyPosts() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: "#F4F6F4",
+    backgroundColor: palette.background,
+  },
+  embeddedSafe: {
+    backgroundColor: "transparent",
   },
   center: {
     flex: 1,
@@ -272,41 +392,49 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 40,
   },
+  embeddedListContent: {
+    paddingTop: 12,
+  },
   pageHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 20,
+    paddingTop: 10,
+    paddingBottom: 14,
+    gap: 12,
+  },
+  pageHeaderText: {
+    flex: 1,
   },
   pageTitle: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#131F17",
+    color: palette.ink,
     letterSpacing: -0.4,
+  },
+  pageSubtitle: {
+    marginTop: 3,
+    color: palette.muted,
+    fontSize: 12.5,
+    fontWeight: "600",
   },
   addBtn: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: radii.md,
     backgroundColor: GREEN,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: GREEN,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...shadows.floating,
   },
   statsRow: {
     flexDirection: "row",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    backgroundColor: palette.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: palette.border,
     marginBottom: 18,
-    shadowColor: "#1A3028",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 2,
+    ...shadows.soft,
     overflow: "hidden",
   },
   statBox: {
@@ -331,20 +459,26 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    backgroundColor: palette.surface,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: palette.border,
     padding: 14,
     marginBottom: 12,
-    shadowColor: "#1A3028",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 2,
+    ...shadows.soft,
+  },
+  cardBlocked: {
+    opacity: 0.72,
+    borderColor: "#E7BABA",
+  },
+  cardResolved: {
+    borderWidth: 1,
+    borderColor: "#C9DDF7",
   },
   cardImage: {
     width: 78,
     height: 78,
-    borderRadius: 14,
+    borderRadius: radii.md,
     backgroundColor: "#E6EDE8",
   },
   cardInfo: {
@@ -356,7 +490,7 @@ const styles = StyleSheet.create({
   postTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#131F17",
+    color: palette.ink,
     lineHeight: 22,
   },
   tagsRow: {
@@ -414,11 +548,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#2C3A31",
+    color: palette.ink,
   },
   emptyText: {
     fontSize: 14,
-    color: "#8E9B93",
+    color: palette.muted,
     textAlign: "center",
     lineHeight: 20,
   },

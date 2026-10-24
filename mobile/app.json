@@ -1,33 +1,48 @@
 {
   "expo": {
-    "scheme": "Semsemapp",
+    "scheme": "semsemapp",
     "name": "Semsem",
     "slug": "Semsem",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/app-logo-phone.png",
+    "icon": "./assets/startup-splash.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/startup-splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/app-logo-phone.png",
+        "foregroundImage": "./assets/startup-splash.png",
         "backgroundColor": "#59BE56"
-      },
-      "edgeToEdgeEnabled": true
+      }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/startup-splash.png",
+      "splash": {
+        "image": "./assets/startup-splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff"
+      }
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Semsem to detect your country and city for Near me filters."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/startup-splash.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ]
     ]
   }
 }

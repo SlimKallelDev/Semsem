@@ -15,7 +15,7 @@ const conversationSchema = new mongoose.Schema(
       default: null,
     },
   },
-  { timestamps: true }
+  { timestamps: true, collection: "conversations" }
 );
 
 conversationSchema.index({ participants: 1 });

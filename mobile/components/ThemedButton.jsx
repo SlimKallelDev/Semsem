@@ -1,32 +1,44 @@
-import { StyleSheet, Text, View, Pressable } from 'react-native'
-import React from 'react'
-import { Colors } from "../constants/Colors"
+import { Pressable, StyleSheet } from "react-native";
 
-function ThemedButton({ style, ...props }) {
+import { Colors } from "../constants/Colors";
+import { radii, shadows } from "../constants/designSystem";
+
+function ThemedButton({ style, disabled = false, ...props }) {
   return (
-        <Pressable 
-        style={({pressed}) => [styles.btn, pressed && styles.pressed] }
-        {...props}
-        />
-  )
-
+    <Pressable
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.btn,
+        pressed && !disabled && styles.pressed,
+        disabled && styles.disabled,
+        typeof style === "function" ? style({ pressed }) : style,
+      ]}
+      {...props}
+    />
+  );
 }
 
 const styles = StyleSheet.create({
-    btn: {
-        backgroundColor: Colors.primary,
-        paddingVertical: 16,
-        paddingHorizontal: 24,
-        borderRadius: 14,
-        marginVertical: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    pressed: {
-        opacity: 0.5,
-    },
+  btn: {
+    minHeight: 52,
+    backgroundColor: Colors.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: radii.md,
+    marginVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    ...shadows.soft,
+  },
+  pressed: {
+    opacity: 0.86,
+    transform: [{ scale: 0.99 }],
+  },
+  disabled: {
+    opacity: 0.55,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+});
 
-})
-
-export default ThemedButton
-
+export default ThemedButton;

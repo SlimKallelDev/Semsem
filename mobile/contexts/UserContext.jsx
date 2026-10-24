@@ -1,7 +1,10 @@
 // mobile/contexts/UserContext.jsx
 import React, { createContext, useContext, useMemo, useState } from "react";
 import { useEffect } from "react";
+import { router } from "expo-router";
+import { Alert } from "react-native";
 import authService from "../services/authService";
+import { subscribeAuthExpired } from "../services/authEvents";
 
 const UserContext = createContext(null);
 
@@ -36,6 +39,26 @@ export const UserProvider = ({ children }) => {
     };
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = subscribeAuthExpired(async (message) => {
+      try {
+        await authService.logout();
+      } catch (error) {
+        console.log("Session clear error:", error?.message || error);
+      } finally {
+        setUser(null);
+        router.replace("/(auth)/login");
+        const isBlocked = String(message || "").toLowerCase().includes("blocked");
+        Alert.alert(
+          isBlocked ? "Account blocked" : "Session expired",
+          message || "Please login again."
+        );
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
   const login = async (email, password) => {
     setLoading(true);
     try {
@@ -52,10 +75,22 @@ export const UserProvider = ({ children }) => {
     }
   };
 
-  const register = async (name, email, password) => {
+  const register = async (
+    name,
+    email,
+    password,
+    profileType,
+    profileDetails = {}
+  ) => {
     setLoading(true);
     try {
-      const data = await authService.register(name, email, password);
+      const data = await authService.register(
+        name,
+        email,
+        password,
+        profileType,
+        profileDetails
+      );
 
       setUser(data.user || data);
 

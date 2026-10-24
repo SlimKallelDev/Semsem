@@ -1,26 +1,6 @@
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import API_BASE_URL from "./api";
+import { createApiClient } from "./api";
 
-const API = axios.create({
-  baseURL: API_BASE_URL,
-});
-
-API.interceptors.request.use(
-  async (config) => {
-    const token = await AsyncStorage.getItem("token");
-
-    if (token) {
-      config.headers = {
-        ...config.headers,
-        Authorization: `Bearer ${token}`,
-      };
-    }
-
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+const API = createApiClient();
 
 export const getLikesByPost = async (postId) => {
   try {
@@ -33,6 +13,21 @@ export const getLikesByPost = async (postId) => {
     );
     throw new Error(
       error?.response?.data?.message || "Failed to load likes"
+    );
+  }
+};
+
+export const getMyLikes = async () => {
+  try {
+    const response = await API.get("/likes/me");
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (error) {
+    console.error(
+      "getMyLikes error:",
+      error?.response?.data || error.message
+    );
+    throw new Error(
+      error?.response?.data?.message || "Failed to load your likes"
     );
   }
 };
@@ -119,6 +114,7 @@ export const toggleLike = async (postId, userId) => {
 
 export default {
   getLikesByPost,
+  getMyLikes,
   likePost,
   unlikePost,
   isPostLiked,

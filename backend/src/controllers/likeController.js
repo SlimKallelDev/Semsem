@@ -1,6 +1,18 @@
 const Like = require("../models/Like");
 const Post = require("../models/Post");
 const { createNotification } = require("../services/notificationService");
+const { USER_PUBLIC_FIELDS } = require("../constants/userPublicFields");
+const {
+  POST_STATUS,
+  USER_STATUS,
+} = require("../constants/moderationStatuses");
+
+const findPublishedPost = (postId) =>
+  Post.findOne({ _id: postId, status: POST_STATUS.PUBLISHED }).populate({
+    path: "user",
+    match: { status: USER_STATUS.ACTIVE },
+    select: "_id",
+  });
 
 const likePost = async (req, res, next) => {
   try {
@@ -16,9 +28,9 @@ const likePost = async (req, res, next) => {
       return res.status(400).json({ message: "userId is required" });
     }
 
-    const post = await Post.findById(postId);
+    const post = await findPublishedPost(postId);
 
-    if (!post) {
+    if (!post || !post.user) {
       return res.status(404).json({ message: "Post not found" });
     }
 
@@ -36,12 +48,12 @@ const likePost = async (req, res, next) => {
       user: finalUserId,
     });
 
-    post.likes_count = await Like.countDocuments({ post: postId });
+    post.likesCount = await Like.countDocuments({ post: postId });
     await post.save();
 
     const populatedLike = await Like.findById(like._id)
-      .populate("user")
-      .populate("post");
+      .populate("user", USER_PUBLIC_FIELDS)
+      .populate("post", "_id title user");
 
     await createNotification({
       recipient: post.user,
@@ -90,7 +102,7 @@ const unlikePost = async (req, res, next) => {
     const post = await Post.findById(postId);
 
     if (post) {
-      post.likes_count = await Like.countDocuments({ post: postId });
+      post.likesCount = await Like.countDocuments({ post: postId });
       await post.save();
     }
 
@@ -103,9 +115,28 @@ const unlikePost = async (req, res, next) => {
 const getLikesByPost = async (req, res, next) => {
   try {
     const { postId } = req.params;
+    const post = await findPublishedPost(postId);
+
+    if (!post || !post.user) {
+      return res.status(404).json({ message: "Post not found" });
+    }
 
     const likes = await Like.find({ post: postId })
-      .populate("user")
+      .populate("user", USER_PUBLIC_FIELDS)
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(likes);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getMyLikes = async (req, res, next) => {
+  try {
+    const userId = req.user?.userId;
+
+    const likes = await Like.find({ user: userId })
+      .populate("post", "_id title image images type user")
       .sort({ createdAt: -1 });
 
     res.status(200).json(likes);
@@ -118,4 +149,5 @@ module.exports = {
   likePost,
   unlikePost,
   getLikesByPost,
+  getMyLikes,
 };

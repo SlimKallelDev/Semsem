@@ -1,17 +1,49 @@
-import { Text, useColorScheme } from 'react-native'
-import { Colors } from "../constants/Colors"
+import { StyleSheet, Text } from "react-native";
 
-const ThemedText = ({ style, title = false, color, ...props }) => {
-  const colorScheme = useColorScheme()
-  const theme = Colors[colorScheme] ?? Colors.light
-  const textColor = color || (title ? theme.title : theme.text)  // <-- use color prop if provided
+import { Colors } from "../constants/Colors";
+import { typography } from "../constants/designSystem";
+
+const TYPE_STYLES = {
+  display: typography.display,
+  title: typography.title,
+  section: typography.section,
+  subtitle: typography.body,
+  body: typography.body,
+  bodyStrong: typography.bodyStrong,
+  caption: typography.caption,
+};
+
+const ThemedText = ({
+  style,
+  title = false,
+  type = null,
+  color,
+  ...props
+}) => {
+  const theme = Colors.light;
+  const resolvedType = type;
+  const typeStyle = TYPE_STYLES[resolvedType] || styles.body;
+  const textColor =
+    color ||
+    (["display", "title", "section"].includes(resolvedType) || title
+      ? theme.title
+      : theme.text);
 
   return (
     <Text
-      style={[{ color: textColor }, style]}
+      style={[styles.base, typeStyle, { color: textColor }, style]}
       {...props}
     />
-  )
-}
+  );
+};
 
-export default ThemedText
+const styles = StyleSheet.create({
+  base: {
+    includeFontPadding: false,
+  },
+  body: {
+    fontSize: 15,
+  },
+});
+
+export default ThemedText;

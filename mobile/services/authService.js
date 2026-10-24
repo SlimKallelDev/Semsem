@@ -1,14 +1,16 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { request } from "./api";
+import { request, resetAuthExpiredNotice } from "./api";
 
 const login = async (email, password) => {
   const data = await request("/auth/login", {
     method: "POST",
+    skipAuth: true,
     body: JSON.stringify({ email, password }),
   });
 
   if (data?.token) {
     await AsyncStorage.setItem("token", data.token);
+    resetAuthExpiredNotice();
   }
 
   if (data?.user) {
@@ -18,14 +20,28 @@ const login = async (email, password) => {
   return data;
 };
 
-const register = async (name, email, password) => {
+const register = async (
+  name,
+  email,
+  password,
+  profileType,
+  profileDetails = {}
+) => {
   const data = await request("/auth/register", {
     method: "POST",
-    body: JSON.stringify({ name, email, password }),
+    skipAuth: true,
+    body: JSON.stringify({
+      name,
+      email,
+      password,
+      profileType,
+      ...profileDetails,
+    }),
   });
 
   if (data?.token) {
     await AsyncStorage.setItem("token", data.token);
+    resetAuthExpiredNotice();
   }
 
   if (data?.user) {

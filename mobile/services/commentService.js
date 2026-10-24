@@ -1,9 +1,6 @@
-import axios from "axios";
-import API_BASE_URL from "./api";
+import { createApiClient } from "./api";
 
-const API = axios.create({
-  baseURL: API_BASE_URL,
-});
+const API = createApiClient();
 
 export const createComment = async (commentData) => {
   try {
@@ -14,7 +11,11 @@ export const createComment = async (commentData) => {
       "createComment error:",
       error?.response?.data || error.message
     );
-    throw error;
+    throw new Error(
+      error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        "Failed to create comment"
+    );
   }
 };
 
@@ -27,7 +28,28 @@ export const getCommentsByPost = async (postId) => {
       "getCommentsByPost error:",
       error?.response?.data || error.message
     );
-    throw error;
+    throw new Error(
+      error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        "Failed to load comments"
+    );
+  }
+};
+
+export const getMyComments = async () => {
+  try {
+    const response = await API.get("/comments/me");
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (error) {
+    console.error(
+      "getMyComments error:",
+      error?.response?.data || error.message
+    );
+    throw new Error(
+      error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        "Failed to load your comments"
+    );
   }
 };
 
@@ -40,7 +62,11 @@ export const updateComment = async (id, text) => {
       "updateComment error:",
       error?.response?.data || error.message
     );
-    throw error;
+    throw new Error(
+      error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        "Failed to update comment"
+    );
   }
 };
 
@@ -53,13 +79,18 @@ export const deleteComment = async (id) => {
       "deleteComment error:",
       error?.response?.data || error.message
     );
-    throw error;
+    throw new Error(
+      error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        "Failed to delete comment"
+    );
   }
 };
 
 export default {
   createComment,
   getCommentsByPost,
+  getMyComments,
   updateComment,
   deleteComment,
 };

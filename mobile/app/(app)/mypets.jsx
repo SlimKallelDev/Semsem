@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,10 +14,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 
 import ThemedText from "../../components/ThemedText";
+import {
+  palette,
+  radii,
+  shadows,
+} from "../../constants/designSystem";
 import { useUser } from "../../contexts/UserContext";
 import { deletePet, getPetsByOwner } from "../../services/petService";
 
-const GREEN = "#3DB85C";
+const GREEN = palette.primary;
 
 function formatAge(dateValue) {
   if (!dateValue) return null;
@@ -120,8 +125,8 @@ function PetRow({ item, onDelete }) {
   );
 }
 
-export default function MyPetsScreen() {
-  const { user } = useUser();
+export default function MyPetsScreen({ embedded = false, onCountChange } = {}) {
+  const { user, initializing } = useUser();
 
   const userId = useMemo(
     () => user?._id || user?.id || user?.$id || null,
@@ -135,26 +140,35 @@ export default function MyPetsScreen() {
   const loadMyPets = useCallback(async () => {
     if (!userId) {
       setPets([]);
+      onCountChange?.(0);
       setLoading(false);
       setRefreshing(false);
       return;
     }
     try {
       const data = await getPetsByOwner(userId);
-      setPets(Array.isArray(data) ? data : []);
+      const nextPets = Array.isArray(data) ? data : [];
+      setPets(nextPets);
+      onCountChange?.(nextPets.length);
     } catch (error) {
       console.error("Error loading my pets:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [userId]);
+  }, [onCountChange, userId]);
 
   useFocusEffect(
     useCallback(() => {
       loadMyPets();
     }, [loadMyPets])
   );
+
+  useEffect(() => {
+    if (!embedded && !initializing && !userId) {
+      router.replace("/(auth)/login");
+    }
+  }, [embedded, initializing, userId]);
 
   const handleDelete = (petId) => {
     Alert.alert("Delete Pet", "Are you sure you want to delete this pet?", [
@@ -165,7 +179,11 @@ export default function MyPetsScreen() {
         onPress: async () => {
           try {
             await deletePet(petId);
-            setPets((prev) => prev.filter((p) => (p._id || p.id) !== petId));
+            setPets((prev) => {
+              const nextPets = prev.filter((p) => (p._id || p.id) !== petId);
+              onCountChange?.(nextPets.length);
+              return nextPets;
+            });
           } catch {
             Alert.alert("Error", "Failed to delete pet");
           }
@@ -176,7 +194,10 @@ export default function MyPetsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={["top"]}>
+      <SafeAreaView
+        style={[styles.safe, embedded && styles.embeddedSafe]}
+        edges={[]}
+      >
         <View style={styles.center}>
           <ActivityIndicator size="large" color={GREEN} />
         </View>
@@ -184,25 +205,23 @@ export default function MyPetsScreen() {
     );
   }
 
-  if (!userId) {
-    return (
-      <SafeAreaView style={styles.safe} edges={["top"]}>
-        <View style={styles.center}>
-          <ThemedText>You need to be logged in to see your pets.</ThemedText>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  if (!userId) return null;
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView
+      style={[styles.safe, embedded && styles.embeddedSafe]}
+      edges={[]}
+    >
       <FlatList
         data={pets}
         keyExtractor={(item, i) => item?._id || item?.id || String(i)}
         renderItem={({ item }) => (
           <PetRow item={item} onDelete={handleDelete} />
         )}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          embedded && styles.embeddedListContent,
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -211,12 +230,12 @@ export default function MyPetsScreen() {
             tintColor={GREEN}
           />
         }
-        ListHeaderComponent={
+        ListHeaderComponent={!embedded ? (
           <View style={styles.pageHeader}>
             <View>
               <ThemedText style={styles.pageTitle}>My Pets</ThemedText>
               <ThemedText style={styles.pageSubtitle}>
-                {pets.length} pet{pets.length !== 1 ? "s" : ""} registered
+                Profiles and health records for your companions
               </ThemedText>
             </View>
             <TouchableOpacity
@@ -227,7 +246,7 @@ export default function MyPetsScreen() {
               <Ionicons name="add" size={26} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
-        }
+        ) : null}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="paw-outline" size={40} color={GREEN} />
@@ -245,7 +264,10 @@ export default function MyPetsScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: "#F4F6F4",
+    backgroundColor: palette.background,
+  },
+  embeddedSafe: {
+    backgroundColor: "transparent",
   },
   center: {
     flex: 1,
@@ -256,53 +278,53 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 40,
   },
+  embeddedListContent: {
+    paddingTop: 12,
+  },
   pageHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 20,
+    paddingTop: 10,
+    paddingBottom: 14,
+    gap: 12,
   },
   pageTitle: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#131F17",
+    color: palette.ink,
     letterSpacing: -0.4,
   },
   pageSubtitle: {
     marginTop: 3,
-    fontSize: 14,
-    color: "#8E9B93",
+    color: palette.muted,
+    fontSize: 12.5,
+    fontWeight: "600",
   },
   addBtn: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: radii.md,
     backgroundColor: GREEN,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: GREEN,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...shadows.floating,
   },
   card: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    backgroundColor: palette.surface,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: palette.border,
     padding: 14,
     marginBottom: 12,
-    shadowColor: "#1A3028",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 2,
+    ...shadows.soft,
   },
   cardImage: {
     width: 78,
     height: 78,
-    borderRadius: 14,
+    borderRadius: radii.md,
     backgroundColor: "#E6EDE8",
   },
   cardInfo: {
@@ -319,7 +341,7 @@ const styles = StyleSheet.create({
   petName: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#131F17",
+    color: palette.ink,
     flexShrink: 1,
   },
   typeBadge: {
@@ -340,7 +362,7 @@ const styles = StyleSheet.create({
   },
   breed: {
     fontSize: 13,
-    color: "#8E9B93",
+    color: palette.muted,
     marginBottom: 5,
   },
   metaRow: {
@@ -352,7 +374,7 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 12,
-    color: "#8E9B93",
+    color: palette.muted,
   },
   metaGap: {
     marginLeft: 8,
@@ -383,11 +405,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#2C3A31",
+    color: palette.ink,
   },
   emptyText: {
     fontSize: 14,
-    color: "#8E9B93",
+    color: palette.muted,
     textAlign: "center",
     lineHeight: 20,
   },

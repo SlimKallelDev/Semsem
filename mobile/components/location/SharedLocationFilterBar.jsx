@@ -1,8 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useMemo, useState } from "react";
+import { BlurView } from "expo-blur";
+import { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  Pressable,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -10,13 +15,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const MODE_ICON = {
-  nearby: "navigate",
-  place: "flag-outline",
-  worldwide: "earth-outline",
-};
-
-import { COUNTRIES } from "../../constants/countries";
+import {
+  getLocationSearchOptions,
+} from "../../constants/locationOptions";
 import { useLocationFilter } from "../../contexts/LocationFilterContext";
 import ThemedText from "../ThemedText";
 
@@ -26,8 +27,10 @@ export default function SharedLocationFilterBar() {
   const insets = useSafeAreaInsets();
   const {
     mode,
-    selectionLabel,
-    selectedCity,
+    nearbySummary,
+    locationLoading,
+    locationDetectionEnabled,
+    selectedGovernorate,
     selectedCountry,
     setNearby,
     setWorldwide,
@@ -36,25 +39,86 @@ export default function SharedLocationFilterBar() {
 
   const [isOpen, setIsOpen] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
-  const [countrySearch, setCountrySearch] = useState("");
-  const [draftCity, setDraftCity] = useState(selectedCity);
-  const [draftCountry, setDraftCountry] = useState(selectedCountry);
+  const [locationSearch, setLocationSearch] = useState("");
+  const hasLocationSearch = locationSearch.trim().length > 0;
 
-  useEffect(() => {
-    setDraftCity(selectedCity);
-    setDraftCountry(selectedCountry);
-  }, [selectedCity, selectedCountry]);
+  const filteredLocations = useMemo(
+    () =>
+      pickerVisible && hasLocationSearch
+        ? getLocationSearchOptions(locationSearch, {
+            currentLocation: {
+              country: selectedCountry,
+              governorate: selectedGovernorate,
+            },
+          })
+        : [],
+    [
+      hasLocationSearch,
+      locationSearch,
+      pickerVisible,
+      selectedCountry,
+      selectedGovernorate,
+    ]
+  );
 
-  const filteredCountries = useMemo(() => {
-    if (!countrySearch.trim()) return COUNTRIES;
-    return COUNTRIES.filter((c) =>
-      c.toLowerCase().includes(countrySearch.trim().toLowerCase())
-    );
-  }, [countrySearch]);
+  const nearMeDescription = useMemo(() => {
+    if (locationLoading) {
+      return "Detecting your country and city...";
+    }
 
-  const handleNearMe = () => {
-    setNearby();
-    setIsOpen(false);
+    if (nearbySummary) {
+      return `Posts and pets around ${nearbySummary}`;
+    }
+
+    if (!locationDetectionEnabled) {
+      return "Activate detect location first";
+    }
+
+    return "Posts and pets around your location";
+  }, [locationDetectionEnabled, locationLoading, nearbySummary]);
+
+  const pillMeta = useMemo(() => {
+    if (locationLoading) {
+      return {
+        title: "Detecting",
+        subtitle: "Location",
+      };
+    }
+
+    if (mode === "nearby") {
+      return {
+        title: "Near me",
+        subtitle: nearbySummary || "Your location",
+      };
+    }
+
+    if (mode === "place") {
+      return {
+        title: "Country / City",
+        subtitle:
+          [selectedCountry, selectedGovernorate].filter(Boolean).join(", ") ||
+          "Selected area",
+      };
+    }
+
+    return {
+      title: "All over",
+      subtitle: "the world",
+    };
+  }, [
+    locationLoading,
+    mode,
+    nearbySummary,
+    selectedCountry,
+    selectedGovernorate,
+  ]);
+
+  const handleNearMe = async () => {
+    const hasNearbyLocation = await setNearby();
+
+    if (hasNearbyLocation) {
+      setIsOpen(false);
+    }
   };
 
   const handleWorldwide = () => {
@@ -63,228 +127,317 @@ export default function SharedLocationFilterBar() {
   };
 
   const handleOpenPicker = () => {
+    setIsOpen(false);
     setPickerVisible(true);
   };
 
   const handleClosePicker = () => {
     setPickerVisible(false);
-    setCountrySearch("");
+    setLocationSearch("");
   };
 
-  const handleApplyPlace = () => {
-    if (!draftCity.trim() && !draftCountry.trim()) return;
-    applyCustomPlace({ city: draftCity, country: draftCountry });
+  const handleSelectPlace = (location) => {
+    applyCustomPlace({
+      governorate: location.governorate,
+      country: location.country,
+    });
     handleClosePicker();
     setIsOpen(false);
   };
 
+  const overlayPaddingTop = Math.max(insets.top + 54, 86);
+
   return (
     <>
-      {/* ── Full-width filter bar ── */}
       <TouchableOpacity
-        style={styles.filterBar}
+        style={styles.locationPill}
         onPress={() => setIsOpen((v) => !v)}
         activeOpacity={0.88}
+        accessibilityRole="button"
+        accessibilityLabel={`Location filter: ${pillMeta.title} ${pillMeta.subtitle}`}
       >
-        <View style={styles.filterLeft}>
-          <Ionicons name={MODE_ICON[mode]} size={16} color={GREEN} />
-          <ThemedText style={styles.filterLabel} numberOfLines={1}>
-            {selectionLabel}
+        <View style={styles.locationPillIcon}>
+          {locationLoading ? (
+            <ActivityIndicator size="small" color={GREEN} />
+          ) : (
+            <Ionicons name="location" size={16} color={GREEN} />
+          )}
+        </View>
+        <View style={styles.locationPillTextWrap}>
+          <ThemedText style={styles.locationPillTitle} numberOfLines={1}>
+            {pillMeta.title}
+          </ThemedText>
+          <ThemedText style={styles.locationPillSubtitle} numberOfLines={1}>
+            {pillMeta.subtitle}
           </ThemedText>
         </View>
         <Ionicons
           name={isOpen ? "chevron-up" : "chevron-down"}
-          size={18}
-          color="#9AA39E"
+          size={14}
+          color="#7E8A82"
         />
       </TouchableOpacity>
 
-      {/* ── Inline dropdown ── */}
-      {isOpen && (
-        <View style={styles.dropdown}>
-          {/* Near Me */}
-          <TouchableOpacity
-            style={styles.option}
-            onPress={handleNearMe}
-            activeOpacity={0.82}
+      {/* Focused filter options overlay */}
+      <Modal
+        visible={isOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsOpen(false)}
+      >
+        <View style={styles.focusOverlayRoot}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setIsOpen(false)}
           >
-            <View style={[styles.optionIconWrap, { backgroundColor: GREEN }]}>
-              <Ionicons name="navigate" size={17} color="#FFFFFF" />
-            </View>
-            <View style={styles.optionBody}>
-              <ThemedText style={styles.optionTitle}>Near Me</ThemedText>
-              <ThemedText style={styles.optionDesc}>
-                Posts around your location
-              </ThemedText>
-            </View>
-            {mode === "nearby" && (
-              <Ionicons name="checkmark-circle" size={22} color={GREEN} />
-            )}
-          </TouchableOpacity>
+            <BlurView intensity={30} tint="light" style={StyleSheet.absoluteFill}>
+              <View style={styles.focusOverlayDim} />
+            </BlurView>
+          </Pressable>
 
-          <View style={styles.divider} />
-
-          {/* Country / City */}
-          <TouchableOpacity
-            style={styles.option}
-            onPress={handleOpenPicker}
-            activeOpacity={0.82}
+          <View
+            style={[
+              styles.focusOverlayContent,
+              {
+                paddingTop: overlayPaddingTop,
+              },
+            ]}
           >
-            <View style={[styles.optionIconWrap, { backgroundColor: "#E6F4EC" }]}>
-              <Ionicons name="flag-outline" size={17} color={GREEN} />
-            </View>
-            <View style={styles.optionBody}>
-              <ThemedText style={styles.optionTitle}>Country / City</ThemedText>
-              <ThemedText style={styles.optionDesc}>
-                Filter by country or city
-              </ThemedText>
-            </View>
-            {mode === "place" ? (
-              <Ionicons name="checkmark-circle" size={22} color={GREEN} />
-            ) : (
-              <Ionicons name="chevron-forward" size={18} color="#C2CAC4" />
-            )}
-          </TouchableOpacity>
+            <View style={styles.dropdown}>
+              {/* Near Me */}
+              <TouchableOpacity
+                style={styles.option}
+                onPress={handleNearMe}
+                activeOpacity={0.82}
+                disabled={locationLoading}
+              >
+                <View style={[styles.optionIconWrap, { backgroundColor: GREEN }]}>
+                  <Ionicons name="navigate" size={17} color="#FFFFFF" />
+                </View>
+                <View style={styles.optionBody}>
+                  <ThemedText style={styles.optionTitle}>Near Me</ThemedText>
+                  <ThemedText style={styles.optionDesc}>{nearMeDescription}</ThemedText>
+                </View>
+                {locationLoading ? (
+                  <ActivityIndicator size="small" color={GREEN} />
+                ) : mode === "nearby" ? (
+                  <Ionicons name="checkmark-circle" size={22} color={GREEN} />
+                ) : null}
+              </TouchableOpacity>
 
-          <View style={styles.divider} />
+              <View style={styles.divider} />
 
-          {/* All over the world */}
-          <TouchableOpacity
-            style={styles.option}
-            onPress={handleWorldwide}
-            activeOpacity={0.82}
-          >
-            <View style={[styles.optionIconWrap, { backgroundColor: "#E6F4EC" }]}>
-              <Ionicons name="earth-outline" size={17} color={GREEN} />
+              {/* Country / City */}
+              <TouchableOpacity
+                style={styles.option}
+                onPress={handleOpenPicker}
+                activeOpacity={0.82}
+              >
+                <View style={[styles.optionIconWrap, { backgroundColor: "#E6F4EC" }]}>
+                  <Ionicons name="flag-outline" size={17} color={GREEN} />
+                </View>
+                <View style={styles.optionBody}>
+                  <ThemedText style={styles.optionTitle}>Country / City</ThemedText>
+                  <ThemedText style={styles.optionDesc}>
+                    Filter by one selected country and city
+                  </ThemedText>
+                </View>
+                {mode === "place" ? (
+                  <Ionicons name="checkmark-circle" size={22} color={GREEN} />
+                ) : (
+                  <Ionicons name="chevron-forward" size={18} color="#C2CAC4" />
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.divider} />
+
+              {/* All over the world */}
+              <TouchableOpacity
+                style={styles.option}
+                onPress={handleWorldwide}
+                activeOpacity={0.82}
+              >
+                <View style={[styles.optionIconWrap, { backgroundColor: "#E6F4EC" }]}>
+                  <Ionicons name="earth-outline" size={17} color={GREEN} />
+                </View>
+                <View style={styles.optionBody}>
+                  <ThemedText style={styles.optionTitle}>All over the world</ThemedText>
+                  <ThemedText style={styles.optionDesc}>
+                    Browse posts and pets globally
+                  </ThemedText>
+                </View>
+                {mode === "worldwide" && (
+                  <Ionicons name="checkmark-circle" size={22} color={GREEN} />
+                )}
+              </TouchableOpacity>
             </View>
-            <View style={styles.optionBody}>
-              <ThemedText style={styles.optionTitle}>All over the world</ThemedText>
-              <ThemedText style={styles.optionDesc}>
-                Browse all posts globally
-              </ThemedText>
-            </View>
-            {mode === "worldwide" && (
-              <Ionicons name="checkmark-circle" size={22} color={GREEN} />
-            )}
-          </TouchableOpacity>
+          </View>
         </View>
-      )}
+      </Modal>
 
-      {/* ── Country / City picker modal ── */}
+      {/* Country / City picker modal */}
       <Modal
         visible={pickerVisible}
         animationType="slide"
         onRequestClose={handleClosePicker}
       >
-        <View style={styles.pickerScreen}>
-          {/* Fixed navigation-style header */}
-          <View style={[styles.pickerNavBar, { paddingTop: insets.top }]}>
-            <ThemedText style={styles.pickerNavTitle}>Country / City</ThemedText>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={handleClosePicker}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="close" size={22} color="#3C4A40" />
-            </TouchableOpacity>
+        <KeyboardAvoidingView
+          style={styles.pickerKeyboard}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={0}
+        >
+          <View style={styles.pickerScreen}>
+            {/* Fixed navigation-style header */}
+            <View style={[styles.pickerNavBar, { paddingTop: insets.top }]}>
+              <ThemedText style={styles.pickerNavTitle}>Country / City</ThemedText>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={handleClosePicker}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="close" size={22} color="#3C4A40" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Scrollable content */}
+            <View style={styles.pickerContent}>
+              <ThemedText style={styles.pickerSubtitle}>
+                Search by country or city, then select one entry.
+              </ThemedText>
+
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search city or country"
+                placeholderTextColor="#97A29B"
+                value={locationSearch}
+                onChangeText={setLocationSearch}
+                autoFocus
+                autoCapitalize="words"
+                autoCorrect={false}
+              />
+
+              <FlatList
+                data={filteredLocations}
+                keyExtractor={(item) => item.key}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                style={styles.locationList}
+                ListEmptyComponent={
+                  <View style={styles.emptyState}>
+                    <Ionicons name="search-outline" size={22} color="#A5B0AA" />
+                    <ThemedText style={styles.emptyText}>
+                      {hasLocationSearch
+                        ? "No location found. Try Tunis, Sousse, or Paris."
+                        : "Start typing to search locations."}
+                    </ThemedText>
+                  </View>
+                }
+                renderItem={({ item }) => {
+                  const active =
+                    selectedCountry === item.country &&
+                    selectedGovernorate === item.governorate;
+
+                  return (
+                    <TouchableOpacity
+                      style={styles.locationItem}
+                      onPress={() => handleSelectPlace(item)}
+                      activeOpacity={0.84}
+                    >
+                      <View style={styles.locationItemIcon}>
+                        <Ionicons name="location-outline" size={17} color={GREEN} />
+                      </View>
+                      <ThemedText style={styles.locationItemText}>
+                        {item.label}
+                      </ThemedText>
+                      {active ? (
+                        <Ionicons name="checkmark-circle" size={21} color={GREEN} />
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            </View>
           </View>
-
-          {/* Scrollable content */}
-          <View style={styles.pickerContent}>
-            <ThemedText style={styles.pickerSubtitle}>
-              Pick a country, a city, or both.
-            </ThemedText>
-
-            <TextInput
-              style={styles.cityInput}
-              placeholder="City (optional)"
-              placeholderTextColor="#97A29B"
-              value={draftCity}
-              onChangeText={setDraftCity}
-            />
-
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search country"
-              placeholderTextColor="#97A29B"
-              value={countrySearch}
-              onChangeText={setCountrySearch}
-            />
-
-            <FlatList
-              data={filteredCountries}
-              keyExtractor={(item) => item}
-              showsVerticalScrollIndicator={false}
-              style={styles.countryList}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.countryItem}
-                  onPress={() => {
-                    setDraftCountry(item);
-                    setCountrySearch("");
-                  }}
-                >
-                  <ThemedText style={styles.countryItemText}>{item}</ThemedText>
-                  {draftCountry === item && (
-                    <Ionicons name="checkmark" size={20} color={GREEN} />
-                  )}
-                </TouchableOpacity>
-              )}
-            />
-
-            <TouchableOpacity
-              style={[
-                styles.applyButton,
-                !draftCity.trim() &&
-                  !draftCountry.trim() &&
-                  styles.applyButtonDisabled,
-              ]}
-              onPress={handleApplyPlace}
-              disabled={!draftCity.trim() && !draftCountry.trim()}
-              activeOpacity={0.88}
-            >
-              <ThemedText style={styles.applyButtonText}>Apply</ThemedText>
-            </TouchableOpacity>
-          </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  /* ── Full-width filter bar ── */
-  filterBar: {
+  /* Compact header trigger */
+  locationPill: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 18,
-    paddingVertical: 13,
-    borderBottomWidth: 1,
-    borderBottomColor: "#EDEEF0",
+    alignSelf: "center",
+    minWidth: 128,
+    maxWidth: 168,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#D4E8DE",
+    backgroundColor: "#FAFCFB",
+    paddingLeft: 8,
+    paddingRight: 9,
+    shadowColor: "#0D1F14",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  filterLeft: {
-    flexDirection: "row",
+  locationPillIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 13,
+    backgroundColor: "#E9F7ED",
     alignItems: "center",
-    gap: 8,
+    justifyContent: "center",
+    marginRight: 6,
   },
-  filterLabel: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#172018",
+  locationPillTextWrap: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 4,
+  },
+  locationPillTitle: {
+    color: "#1E2B23",
+    fontSize: 11.5,
+    fontWeight: "900",
+    lineHeight: 15,
+  },
+  locationPillSubtitle: {
+    color: GREEN,
+    fontSize: 10.5,
+    fontWeight: "800",
+    lineHeight: 13,
   },
 
-  /* ── Inline dropdown ── */
+  /* Inline dropdown */
+  focusOverlayRoot: {
+    flex: 1,
+  },
+  focusOverlayDim: {
+    flex: 1,
+    backgroundColor: "rgba(22, 30, 25, 0.2)",
+  },
+  focusOverlayContent: {
+    flex: 1,
+    paddingHorizontal: 14,
+    alignItems: "center",
+  },
   dropdown: {
+    width: "100%",
+    maxWidth: 560,
     backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#EAEFEB",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#DFE8E2",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 8,
+    overflow: "hidden",
   },
   option: {
     flexDirection: "row",
@@ -321,10 +474,13 @@ const styles = StyleSheet.create({
     marginRight: 18,
   },
 
-  /* ── Country/City picker modal ── */
+  /* Country/City picker modal */
   pickerScreen: {
     flex: 1,
     backgroundColor: "#FFFFFF",
+  },
+  pickerKeyboard: {
+    flex: 1,
   },
   pickerNavBar: {
     flexDirection: "row",
@@ -359,17 +515,6 @@ const styles = StyleSheet.create({
     color: "#748078",
     marginBottom: 16,
   },
-  cityInput: {
-    height: 50,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#DCE6DD",
-    backgroundColor: "#FAFCFA",
-    paddingHorizontal: 14,
-    fontSize: 15,
-    color: "#172119",
-    marginBottom: 12,
-  },
   searchInput: {
     height: 50,
     borderRadius: 14,
@@ -381,37 +526,45 @@ const styles = StyleSheet.create({
     color: "#172119",
     marginBottom: 12,
   },
-  countryList: {
+  locationList: {
     flex: 1,
   },
-  countryItem: {
-    minHeight: 56,
+  locationItem: {
+    minHeight: 58,
     borderBottomWidth: 1,
     borderBottomColor: "#EEF2EF",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
   },
-  countryItemText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#233128",
-  },
-  applyButton: {
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: GREEN,
+  locationItemIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: "#EAF8EE",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 14,
-    marginBottom: 8,
+    marginRight: 10,
   },
-  applyButtonDisabled: {
-    opacity: 0.4,
-  },
-  applyButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
+  locationItemText: {
+    flex: 1,
+    fontSize: 15,
     fontWeight: "800",
+    color: "#233128",
+    marginRight: 8,
+  },
+  emptyState: {
+    minHeight: 140,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  emptyText: {
+    marginTop: 8,
+    textAlign: "center",
+    color: "#7F8A84",
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 19,
   },
 });
+

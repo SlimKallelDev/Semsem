@@ -18,9 +18,10 @@ const messageSchema = new mongoose.Schema(
       trim: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true, collection: "messages" }
 );
 
 messageSchema.index({ conversation: 1, createdAt: 1 });
 
-module.exports = mongoose.model("Message", messageSchema);
+module.exports =
+  mongoose.models.Message || mongoose.model("Message", messageSchema);

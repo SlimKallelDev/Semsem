@@ -18,7 +18,7 @@ const commentSchema = new mongoose.Schema(
       trim: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true, collection: 'comments' }
 );
 
 commentSchema.index({ post: 1, createdAt: -1 }); // fast comments per post, newest first

@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -17,13 +16,8 @@ import ThemedText from "../ThemedText";
 import MeetCard from "./MeetCard";
 
 const GREEN = "#3DB85C";
-const PET_FILTERS = [
-  { label: "All", value: "all" },
-  { label: "Cats", value: "cat" },
-  { label: "Dogs", value: "dog" },
-  { label: "Birds", value: "bird" },
-  { label: "Others", value: "other" },
-];
+/** Shared with PostsFeed / ServicesDirectory content top inset */
+const CARD_SECTION_PADDING_TOP = 12;
 
 function matchesType(pet, selectedType) {
   if (selectedType === "all") {
@@ -39,25 +33,40 @@ function matchesType(pet, selectedType) {
   return value.includes(selectedType);
 }
 
-function buildSubtitle(count, label) {
-  if (label === "Near Me") {
-    return `${count} pets near you`;
-  }
-
-  if (label === "All over the world") {
-    return `${count} pets around the world`;
-  }
-
-  return `${count} pets in ${label}`;
+function buildMasonryColumns(items) {
+  return items.reduce(
+    (columns, pet, index) => {
+      columns[index % 2].push({ pet, index });
+      return columns;
+    },
+    [[], []]
+  );
 }
 
-export default function MeetGrid({ ownerId }) {
-  const { filters, selectionLabel } = useLocationFilter();
+function buildDisplayPets(items) {
+  if (!items.length || items.length % 2 === 0) {
+    return items;
+  }
+
+  return [
+    ...items,
+    {
+      _id: "synthetic-meet-card",
+      isSynthetic: true,
+      name: "More friends",
+      type: "Pets",
+      breed: "Nearby",
+      location: "Soon",
+    },
+  ];
+}
+
+export default function MeetGrid({ ownerId, selectedType = "all" }) {
+  const { filters } = useLocationFilter();
   const [pets, setPets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [selectedType, setSelectedType] = useState("all");
 
   const loadPets = useCallback(
     async (isRefresh = false) => {
@@ -76,14 +85,14 @@ export default function MeetGrid({ ownerId }) {
 
         setPets(Array.isArray(data) ? data : []);
       } catch (err) {
-        console.error("Error loading pets:", err?.response?.data || err.message);
+        console.log("Error loading pets:", err?.response?.data || err.message);
         setError("Unable to load pets.");
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [filters.city, filters.country, ownerId]
+    [filters.governorate, filters.country, ownerId]
   );
 
   useFocusEffect(
@@ -97,11 +106,23 @@ export default function MeetGrid({ ownerId }) {
     [pets, selectedType]
   );
 
+  const displayPets = useMemo(
+    () => buildDisplayPets(filteredPets),
+    [filteredPets]
+  );
+
+  const masonryColumns = useMemo(
+    () => buildMasonryColumns(displayPets),
+    [displayPets]
+  );
+
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={GREEN} />
-        <ThemedText style={styles.stateText}>Loading pets...</ThemedText>
+        <View style={styles.stateCard}>
+          <ActivityIndicator size="large" color={GREEN} />
+          <ThemedText style={styles.stateText}>Loading pets...</ThemedText>
+        </View>
       </View>
     );
   }
@@ -109,24 +130,25 @@ export default function MeetGrid({ ownerId }) {
   if (error) {
     return (
       <View style={styles.center}>
-        <ThemedText style={styles.stateText}>{error}</ThemedText>
+        <View style={styles.stateCard}>
+          <Ionicons name="alert-circle-outline" size={24} color="#7A857F" />
+          <ThemedText style={styles.stateText}>{error}</ThemedText>
+          <TouchableOpacity
+            style={styles.retryButton}
+            activeOpacity={0.86}
+            onPress={() => loadPets()}
+          >
+            <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   return (
-    <FlatList
-      data={filteredPets}
-      keyExtractor={(item, index) =>
-        (item?._id || item?.id || index).toString()
-      }
-      numColumns={2}
-      renderItem={({ item, index }) => (
-        <MeetCard pet={item} index={index} isLastInRow={(index + 1) % 2 === 0} />
-      )}
+    <ScrollView
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.list}
-      columnWrapperStyle={styles.row}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -134,44 +156,8 @@ export default function MeetGrid({ ownerId }) {
           tintColor={GREEN}
         />
       }
-      ListHeaderComponent={
-        <View style={styles.headerBlock}>
-          <View style={styles.topRow}>
-            <View style={styles.titleBlock}>
-              <ThemedText style={styles.title}>To Meet</ThemedText>
-              <ThemedText style={styles.subtitle}>
-                {buildSubtitle(filteredPets.length, selectionLabel)}
-              </ThemedText>
-            </View>
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipsRow}
-          >
-            {PET_FILTERS.map((filter) => {
-              const active = selectedType === filter.value;
-
-              return (
-                <TouchableOpacity
-                  key={filter.value}
-                  style={[styles.chip, active && styles.chipActive]}
-                  activeOpacity={0.88}
-                  onPress={() => setSelectedType(filter.value)}
-                >
-                  <ThemedText
-                    style={[styles.chipText, active && styles.chipTextActive]}
-                  >
-                    {filter.label}
-                  </ThemedText>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-      }
-      ListEmptyComponent={
+    >
+      {filteredPets.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="paw-outline" size={28} color={GREEN} />
           <ThemedText style={styles.emptyTitle}>No pets match this view</ThemedText>
@@ -179,76 +165,51 @@ export default function MeetGrid({ ownerId }) {
             Try another pet type or change the location filter above.
           </ThemedText>
         </View>
-      }
-    />
+      ) : (
+        <View style={styles.masonry}>
+          {masonryColumns.map((column, columnIndex) => (
+            <View
+              key={`column-${columnIndex}`}
+              style={[
+                styles.column,
+                columnIndex === 0 ? styles.leftColumn : styles.rightColumn,
+              ]}
+            >
+              {column.map(({ pet, index }) => (
+                <MeetCard
+                  key={(pet?._id || pet?.id || index).toString()}
+                  pet={pet}
+                  index={index}
+                />
+              ))}
+            </View>
+          ))}
+        </View>
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   list: {
-    paddingBottom: 40,
+    backgroundColor: "#F4F6F4",
+    paddingBottom: 32,
   },
-  row: {
-    paddingHorizontal: 16,
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  headerBlock: {
-    backgroundColor: "#FFFFFF",
-    paddingTop: 20,
-    paddingBottom: 14,
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E9EFEB",
-  },
-  topRow: {
-    paddingHorizontal: 16,
+  masonry: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingTop: CARD_SECTION_PADDING_TOP,
+    alignItems: "flex-start",
+    gap: 12,
   },
-  titleBlock: {
+  column: {
     flex: 1,
-    paddingRight: 12,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#161F19",
+  leftColumn: {
+    paddingTop: 0,
   },
-  subtitle: {
-    marginTop: 3,
-    fontSize: 14,
-    color: "#79847D",
-  },
-  chipsRow: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 2,
-  },
-  chip: {
-    height: 40,
-    paddingHorizontal: 18,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: "#E5E9E6",
-    backgroundColor: "#F9FAF9",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 10,
-  },
-  chipActive: {
-    backgroundColor: "#FFFFFF",
-    borderColor: GREEN,
-  },
-  chipText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#606964",
-  },
-  chipTextActive: {
-    color: GREEN,
-    fontWeight: "700",
+  rightColumn: {
+    paddingTop: 0,
   },
   center: {
     flex: 1,
@@ -256,22 +217,59 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 24,
   },
+  stateCard: {
+    minWidth: 220,
+    maxWidth: 320,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E7EEEA",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    shadowColor: "#214032",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
+  },
   stateText: {
     marginTop: 10,
     fontSize: 14,
     opacity: 0.72,
     textAlign: "center",
   },
+  retryButton: {
+    marginTop: 12,
+    minWidth: 96,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: GREEN,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800",
+  },
   emptyState: {
-    marginHorizontal: 16,
-    marginTop: 18,
-    borderRadius: 24,
+    marginHorizontal: 14,
+    marginTop: CARD_SECTION_PADDING_TOP,
+    borderRadius: 20,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#E8EFEB",
-    paddingVertical: 26,
-    paddingHorizontal: 24,
+    borderColor: "#E7EEEA",
+    paddingVertical: 24,
+    paddingHorizontal: 20,
     alignItems: "center",
+    shadowColor: "#214032",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
   },
   emptyTitle: {
     marginTop: 10,
@@ -287,3 +285,4 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 });
+
