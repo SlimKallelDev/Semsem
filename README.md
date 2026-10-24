@@ -145,7 +145,8 @@ cd mobile
 npm install
 ```
 
-Optionally create `mobile/.env` to override automatic local API discovery:
+The mobile app connects to the Render API by default. To use a different API,
+create `mobile/.env` and set:
 
 ```dotenv
 EXPO_PUBLIC_API_URL=http://YOUR_LOCAL_IP:5000
@@ -167,7 +168,8 @@ cd web
 npm install
 ```
 
-Optionally create `web/.env`:
+The admin dashboard also defaults to the Render API. To use a different API,
+set `VITE_API_URL` in `web/.env`:
 
 ```dotenv
 VITE_API_URL=http://localhost:5000/api
