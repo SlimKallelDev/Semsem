@@ -1,10 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
-import Constants from "expo-constants";
 import { emitAuthExpired } from "./authEvents";
 
-const DEFAULT_LOCAL_HOST = "192.168.1.176";
-const DEFAULT_API_PORT = "5000";
+const DEFAULT_API_URL = "https://semsem-072a.onrender.com/api";
 const REQUEST_TIMEOUT_MS = 20000;
 const MAX_RETRIES = 1;
 let authExpiredNotified = false;
@@ -53,31 +51,9 @@ const normalizeBaseUrl = (url) => {
   return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
 };
 
-const extractExpoHost = () => {
-  const hostUri =
-    Constants.expoConfig?.hostUri ||
-    Constants.manifest2?.extra?.expoGo?.debuggerHost ||
-    Constants.manifest?.debuggerHost ||
-    "";
-  const linkUri = Constants.linkingUri || "";
-
-  const hostFromHostUri = String(hostUri).split(":")[0];
-  const hostFromLinkUri =
-    String(linkUri).match(/:\/\/([^/:]+)/)?.[1] || "";
-
-  return hostFromHostUri || hostFromLinkUri || "";
-};
-
 const buildApiBaseUrl = () => {
   const envUrl = normalizeBaseUrl(process.env.EXPO_PUBLIC_API_URL);
-  if (envUrl) return envUrl;
-
-  const expoHost = extractExpoHost();
-  if (expoHost) {
-    return `http://${expoHost}:${DEFAULT_API_PORT}/api`;
-  }
-
-  return `http://${DEFAULT_LOCAL_HOST}:${DEFAULT_API_PORT}/api`;
+  return envUrl || DEFAULT_API_URL;
 };
 
 const API_BASE_URL = buildApiBaseUrl();

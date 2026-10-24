@@ -1,5 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useMemo, useState } from "react";
+import { useNavigation } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 
 import MeetGrid from "../../components/home/MeetGrid";
@@ -104,6 +105,7 @@ const SECTION_META = {
 };
 
 export default function Home() {
+  const navigation = useNavigation();
   const [activeTab, setActiveTab] = useState("feed");
   const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   const [feedFilter, setFeedFilter] = useState("All");
@@ -122,6 +124,15 @@ export default function Home() {
       activeMeta.filters[0],
     [activeFilterValue, activeMeta.filters]
   );
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("tabPress", () => {
+      setActiveTab("feed");
+      setFilterMenuOpen(false);
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const renderIcon = (item, active = false, size = 15) => {
     const color = active ? SURFACE : TEXT_MUTED;

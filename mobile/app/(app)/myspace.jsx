@@ -10,7 +10,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import {
+  router,
+  useFocusEffect,
+  useLocalSearchParams,
+  useNavigation,
+} from "expo-router";
 
 import ThemedText from "../../components/ThemedText";
 import { useUser } from "../../contexts/UserContext";
@@ -367,6 +372,7 @@ function AppointmentsPanel({ onCountChange }) {
 }
 
 export default function MySpaceScreen() {
+  const navigation = useNavigation();
   const params = useLocalSearchParams();
   const { user, initializing } = useUser();
   const [activeTab, setActiveTab] = useState(() => resolveTab(params?.tab));
@@ -381,6 +387,15 @@ export default function MySpaceScreen() {
   );
   const activeAction = TAB_ACTIONS[activeTab] || null;
   const userId = getEntityId(user);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("tabPress", () => {
+      setActiveTab("pets");
+      navigation.setParams({ tab: "pets" });
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   useEffect(() => {
     if (!initializing && !userId) {
