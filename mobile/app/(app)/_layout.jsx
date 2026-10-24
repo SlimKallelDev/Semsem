@@ -14,10 +14,11 @@ import {
   CHROME_DIVIDER_COLOR,
   CHROME_DIVIDER_HEIGHT,
 } from "../../constants/chromeLayout";
+import { palette, shadows } from "../../constants/designSystem";
 
-const GREEN = "#3DB85C";
-const INACTIVE = "#8F9591";
-const HOME_INACTIVE = "#CFCFCF";
+const GREEN = palette.primary;
+const INACTIVE = palette.muted;
+const HOME_INACTIVE = "#BFC9C2";
 
 function FloatingHomeTabButton({
   accessibilityLabel,
@@ -141,15 +142,17 @@ export default function AppLayout() {
             tabBarActiveTintColor: GREEN,
             tabBarInactiveTintColor: INACTIVE,
             tabBarStyle: {
-              backgroundColor: "#FFFFFF",
-              borderTopColor: "#E9E9E9",
-              height: 70 + tabBarBottomInset,
-              paddingTop: 6,
+              backgroundColor: palette.surface,
+              borderTopColor: palette.border,
+              borderTopWidth: 1,
+              height: 68 + tabBarBottomInset,
+              paddingTop: 7,
               paddingBottom: tabBarBottomInset,
+              ...shadows.soft,
             },
             tabBarLabelStyle: {
               fontSize: 11,
-              fontWeight: "600",
+              fontWeight: "700",
               marginTop: 2,
             },
             tabBarIconStyle: {
@@ -308,12 +311,12 @@ export default function AppLayout() {
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: palette.surface,
     height: 108,
   },
   headerBackground: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: palette.surface,
     borderBottomWidth: CHROME_DIVIDER_HEIGHT,
     borderBottomColor: CHROME_DIVIDER_COLOR,
   },
@@ -324,6 +327,7 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   headerLeft: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -333,42 +337,38 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerTitleText: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: "800",
     color: GREEN,
-    letterSpacing: 0.3,
+    letterSpacing: -0.4,
   },
   btnWrap: {
     position: "relative",
   },
   iconButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#FFFFFF",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: palette.surface,
     borderWidth: 1,
-    borderColor: "#E8ECE9",
+    borderColor: palette.border,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+    ...shadows.soft,
   },
   loginButton: {
     height: 34,
     paddingHorizontal: 16,
     borderRadius: 17,
-    backgroundColor: "#E8E8E8",
+    backgroundColor: palette.primarySoft,
     alignItems: "center",
     justifyContent: "center",
   },
   loginButtonText: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#444444",
+    color: palette.primaryStrong,
   },
   messageTabBadge: {
     backgroundColor: "#EE4545",
@@ -387,9 +387,9 @@ const styles = StyleSheet.create({
     marginTop: -20,
   },
   homeTabCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     borderWidth: 4,
     borderColor: "#FFFFFF",
     alignItems: "center",
@@ -409,8 +409,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
   },
   profileImage: {
-    width: 42,
-    height: 42,
+    width: 40,
+    height: 40,
   },
   profileDot: {
     position: "absolute",

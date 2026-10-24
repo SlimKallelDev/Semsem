@@ -22,6 +22,11 @@ import ThemedView from "../../../components/ThemedView";
 import ThemedText from "../../../components/ThemedText";
 import { DEFAULT_CURRENCY } from "../../../constants/currencies";
 import {
+  palette,
+  radii,
+  shadows,
+} from "../../../constants/designSystem";
+import {
   resolveCountryName,
   resolveGovernorateForCountry,
 } from "../../../constants/governorates";
@@ -76,6 +81,7 @@ export default function EditPostScreen() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [images, setImages] = useState([]);
+  const [imagesChangedByUser, setImagesChangedByUser] = useState(false);
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
   const [ownedPets, setOwnedPets] = useState([]);
@@ -121,6 +127,25 @@ export default function EditPostScreen() {
     const selected = new Set(selectedPetIds.map((petId) => String(petId)));
     return ownedPets.filter((pet) => selected.has(String(getEntityId(pet))));
   }, [ownedPets, selectedPetIds]);
+  const selectedPetImages = useMemo(
+    () =>
+      [
+        ...new Set(
+          selectedPets
+            .map((pet) => pet?.image || pet?.images?.[0] || "")
+            .map((uri) => String(uri || "").trim())
+            .filter(Boolean)
+        ),
+      ].slice(0, MAX_IMAGES),
+    [selectedPets]
+  );
+  const effectiveImages = useMemo(() => {
+    if (imagesChangedByUser || selectedPetImages.length === 0) {
+      return images;
+    }
+
+    return [...new Set([...selectedPetImages, ...images])].slice(0, MAX_IMAGES);
+  }, [images, imagesChangedByUser, selectedPetImages]);
   const derivedPetType = useMemo(() => {
     const typeParts = selectedPets
       .map((pet) => titleCase(pet?.type))
@@ -140,19 +165,25 @@ export default function EditPostScreen() {
     if (!Array.isArray(assets) || assets.length === 0) return;
 
     setImages((current) => {
-      const next = [...current];
+      const currentEffectiveImages =
+        imagesChangedByUser || selectedPetImages.length === 0
+          ? current
+          : [...new Set([...selectedPetImages, ...current])].slice(0, MAX_IMAGES);
+      const selectedImages = assets
+        .map((asset) => String(asset?.uri || "").trim())
+        .filter(Boolean);
 
-      assets.forEach((asset) => {
-        const uri = String(asset?.uri || "").trim();
-        if (!uri || next.includes(uri) || next.length >= MAX_IMAGES) {
-          return;
-        }
-
-        next.push(uri);
-      });
-
-      return next;
+      return [...new Set([...selectedImages, ...currentEffectiveImages])].slice(
+        0,
+        MAX_IMAGES
+      );
     });
+    setImagesChangedByUser(true);
+  };
+
+  const removeImage = (index) => {
+    setImages(effectiveImages.filter((_, imageIndex) => imageIndex !== index));
+    setImagesChangedByUser(true);
   };
 
   useEffect(() => {
@@ -279,6 +310,7 @@ export default function EditPostScreen() {
         ? [data.image]
         : [];
       setImages(normalizedImages.slice(0, MAX_IMAGES));
+      setImagesChangedByUser(false);
       setPrice(
         data?.price === undefined || data?.price === null
           ? ""
@@ -286,7 +318,7 @@ export default function EditPostScreen() {
       );
       setCurrency(String(data?.currency || DEFAULT_CURRENCY).toUpperCase());
       setSelectedPetIds([]);
-      applyExistingPetType(data?.pet_type || "");
+      applyExistingPetType(data?.petType || "");
       setCountry(data?.location?.country || "");
       setGovernorate(data?.location?.governorate || data?.location?.city || "");
     } catch (error) {
@@ -311,17 +343,11 @@ export default function EditPostScreen() {
         return;
       }
 
-      const remainingSlots = MAX_IMAGES - images.length;
-      if (remainingSlots <= 0) {
-        Alert.alert("Limit reached", `You can upload up to ${MAX_IMAGES} images.`);
-        return;
-      }
-
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsEditing: false,
         allowsMultipleSelection: true,
-        selectionLimit: remainingSlots,
+        selectionLimit: MAX_IMAGES,
         quality: 0.8,
       });
 
@@ -343,11 +369,6 @@ export default function EditPostScreen() {
           "Permission needed",
           "Camera permission is required to take a photo."
         );
-        return;
-      }
-
-      if (images.length >= MAX_IMAGES) {
-        Alert.alert("Limit reached", `You can upload up to ${MAX_IMAGES} images.`);
         return;
       }
 
@@ -441,7 +462,7 @@ export default function EditPostScreen() {
       return;
     }
 
-    if (images.length > MAX_IMAGES) {
+    if (effectiveImages.length > MAX_IMAGES) {
       Alert.alert("Validation", `Please add up to ${MAX_IMAGES} images`);
       return;
     }
@@ -453,14 +474,14 @@ export default function EditPostScreen() {
         type: selectedType,
         title: title.trim(),
         description: description.trim(),
-        images,
+        images: effectiveImages,
         ...(selectedType === POST_TYPES.SALE
           ? {
               price: normalizedSalePrice,
               currency: normalizedSaleCurrency,
             }
           : {}),
-        pet_type: derivedPetType,
+        petType: derivedPetType,
         location: {
           country: normalizedCountry.trim(),
           governorate: normalizedGovernorate.trim(),
@@ -611,8 +632,14 @@ export default function EditPostScreen() {
 
             <ThemedText style={styles.label}>Images (optional, up to 5)</ThemedText>
             <ThemedText style={styles.imageCountText}>
-              {images.length}/{MAX_IMAGES} selected
+              {effectiveImages.length}/{MAX_IMAGES} selected
             </ThemedText>
+            {!imagesChangedByUser && selectedPetImages.length > 0 ? (
+              <ThemedText style={styles.helperText}>
+                The selected pet photo will be the main image. Choose another
+                photo to replace it as the main image.
+              </ThemedText>
+            ) : null}
 
             <View style={styles.imageButtonsRow}>
               <TouchableOpacity
@@ -634,18 +661,14 @@ export default function EditPostScreen() {
               </TouchableOpacity>
             </View>
 
-            {images.length > 0 && (
+            {effectiveImages.length > 0 && (
               <View style={styles.previewList}>
-                {images.map((uri, index) => (
+                {effectiveImages.map((uri, index) => (
                   <View key={`${uri}-${index}`} style={styles.previewItem}>
                     <Image source={{ uri }} style={styles.previewImage} />
                     <TouchableOpacity
                       style={styles.removeImageBadge}
-                      onPress={() =>
-                        setImages((current) =>
-                          current.filter((_, imageIndex) => imageIndex !== index)
-                        )
-                      }
+                      onPress={() => removeImage(index)}
                     >
                       <Ionicons name="close" size={13} color="#FFFFFF" />
                     </TouchableOpacity>
@@ -843,7 +866,7 @@ export default function EditPostScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F4F6F4",
+    backgroundColor: palette.background,
   },
   container: {
     flex: 1,
@@ -852,6 +875,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    width: "100%",
+    maxWidth: 680,
+    alignSelf: "center",
     padding: 16,
     paddingBottom: 40,
   },
@@ -870,11 +896,12 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    backgroundColor: "#fff",
+    borderColor: palette.borderStrong,
+    borderRadius: radii.md,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    backgroundColor: palette.surface,
+    color: palette.ink,
     marginBottom: 14,
   },
   textArea: {
@@ -961,16 +988,17 @@ const styles = StyleSheet.create({
   },
   imageActionButton: {
     flex: 1,
-    backgroundColor: "#f2f2f2",
-    borderRadius: 12,
+    backgroundColor: palette.primaryTint,
+    borderRadius: radii.md,
     paddingVertical: 12,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: palette.borderStrong,
   },
   imageActionButtonText: {
     fontWeight: "700",
+    color: palette.primaryStrong,
   },
   previewList: {
     flexDirection: "row",
@@ -1011,11 +1039,12 @@ const styles = StyleSheet.create({
   },
   petPickerPanel: {
     borderWidth: 1,
-    borderColor: "#DDE8E1",
-    borderRadius: 16,
-    backgroundColor: "#FFFFFF",
-    padding: 10,
+    borderColor: palette.border,
+    borderRadius: radii.lg,
+    backgroundColor: palette.surface,
+    padding: 12,
     marginBottom: 8,
+    ...shadows.soft,
   },
   petPickerMessage: {
     minHeight: 44,
@@ -1147,11 +1176,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   saveButton: {
-    backgroundColor: "#4CAF50",
+    minHeight: 54,
+    backgroundColor: palette.primary,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: radii.md,
     alignItems: "center",
     marginTop: 8,
+    ...shadows.floating,
   },
   saveButtonText: {
     color: "#fff",
@@ -1159,9 +1190,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   cancelButton: {
-    backgroundColor: "#eee",
+    backgroundColor: palette.surface,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: palette.border,
     alignItems: "center",
     marginTop: 10,
   },

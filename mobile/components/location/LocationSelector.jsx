@@ -17,9 +17,13 @@ import {
   getLocationSearchOptions,
   normalizeLocationSelection,
 } from "../../constants/locationOptions";
+import {
+  palette,
+  radii,
+} from "../../constants/designSystem";
 import ThemedText from "../ThemedText";
 
-const GREEN = "#3DB85C";
+const GREEN = palette.primary;
 
 export default function LocationSelector({
   country,
@@ -30,7 +34,7 @@ export default function LocationSelector({
   subtitle = "Search for a city, then select one result",
   buttonStyle,
   textStyle,
-  placeholderTextColor = "#93A198",
+  placeholderTextColor = palette.subtle,
   disabled = false,
   allowClear = false,
 }) {
@@ -90,7 +94,7 @@ export default function LocationSelector({
         >
           {selectedLabel || placeholder}
         </ThemedText>
-        <Ionicons name="chevron-down" size={17} color="#7F8C85" />
+        <Ionicons name="chevron-down" size={17} color={palette.muted} />
       </TouchableOpacity>
 
       <Modal visible={visible} animationType="slide" onRequestClose={handleClose}>
@@ -111,7 +115,7 @@ export default function LocationSelector({
                 activeOpacity={0.82}
                 onPress={handleClose}
               >
-                <Ionicons name="close" size={22} color="#334039" />
+                <Ionicons name="close" size={22} color={palette.ink} />
               </TouchableOpacity>
             </View>
 
@@ -119,7 +123,7 @@ export default function LocationSelector({
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search city or country"
-                placeholderTextColor="#94A19A"
+                placeholderTextColor={palette.subtle}
                 value={search}
                 onChangeText={setSearch}
                 autoFocus
@@ -187,26 +191,26 @@ export default function LocationSelector({
 
 const styles = StyleSheet.create({
   selectButton: {
-    minHeight: 48,
+    minHeight: 52,
     borderWidth: 1,
-    borderColor: "#DCE3DE",
-    borderRadius: 10,
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-    paddingVertical: 11,
+    borderColor: palette.borderStrong,
+    borderRadius: radii.md,
+    backgroundColor: palette.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
   selectText: {
     flex: 1,
-    color: "#1B2420",
+    color: palette.ink,
     fontSize: 15,
     marginRight: 8,
   },
   safeArea: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: palette.surface,
   },
   flex: {
     flex: 1,
@@ -215,7 +219,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "#E9EFEB",
+    borderBottomColor: palette.border,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -225,21 +229,23 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   headerTitle: {
-    color: "#162019",
+    color: palette.ink,
     fontSize: 19,
     fontWeight: "900",
   },
   headerSubtitle: {
     marginTop: 2,
-    color: "#718078",
+    color: palette.muted,
     fontSize: 12,
     fontWeight: "600",
   },
   closeButton: {
     width: 38,
     height: 38,
-    borderRadius: 19,
-    backgroundColor: "#F2F5F3",
+    borderRadius: radii.md,
+    backgroundColor: palette.surfaceMuted,
+    borderWidth: 1,
+    borderColor: palette.border,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -252,17 +258,17 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#DCE6DD",
-    backgroundColor: "#FAFCFA",
+    borderColor: palette.borderStrong,
+    backgroundColor: palette.surface,
     paddingHorizontal: 14,
-    color: "#172119",
+    color: palette.ink,
     fontSize: 15,
     marginBottom: 8,
   },
   clearRow: {
     minHeight: 46,
-    borderRadius: 12,
-    backgroundColor: "#FFF7F7",
+    borderRadius: radii.md,
+    backgroundColor: palette.dangerSoft,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
@@ -285,14 +291,14 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 12,
-    backgroundColor: "#EAF8EE",
+    backgroundColor: palette.primarySoft,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 10,
   },
   locationText: {
     flex: 1,
-    color: "#25332A",
+    color: palette.ink,
     fontSize: 15,
     fontWeight: "800",
     marginRight: 8,

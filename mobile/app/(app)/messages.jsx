@@ -8,12 +8,17 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
 import ThemedText from "../../components/ThemedText";
 import ThemedView from "../../components/ThemedView";
-import Spacer from "../../components/Spacer";
+import {
+  palette,
+  radii,
+  shadows,
+} from "../../constants/designSystem";
 import { formatUserTypeRatingWithCount } from "../../constants/userDisplay";
 import { useUser } from "../../contexts/UserContext";
 import { getUserConversations } from "../../services/messageService";
@@ -136,13 +141,21 @@ export default function MessagesScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={[]}>
       <ThemedView style={styles.container}>
-        <ThemedText style={styles.title}>Messages</ThemedText>
-
-        <ThemedText style={styles.subtitle}>
-          All your conversations with other users
-        </ThemedText>
-
-        <Spacer height={16} />
+        <View style={styles.headerCard}>
+          <View style={styles.headerIcon}>
+            <Ionicons
+              name="chatbubbles-outline"
+              size={27}
+              color={palette.primary}
+            />
+          </View>
+          <View style={styles.headerText}>
+            <ThemedText style={styles.title}>Messages</ThemedText>
+            <ThemedText style={styles.subtitle}>
+              Your conversations with the Semsem community
+            </ThemedText>
+          </View>
+        </View>
 
         <FlatList
           data={conversations}
@@ -158,6 +171,13 @@ export default function MessagesScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
+              <View style={styles.emptyIcon}>
+                <Ionicons
+                  name="chatbubble-ellipses-outline"
+                  size={32}
+                  color={palette.primary}
+                />
+              </View>
               <ThemedText style={styles.emptyTitle}>No conversations yet</ThemedText>
               <ThemedText style={styles.emptyText}>
                 Open a pet profile and tap "Message" to start chatting.
@@ -173,7 +193,7 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F4F6F4",
+    backgroundColor: palette.background,
   },
   container: {
     flex: 1,
@@ -186,15 +206,41 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 24,
   },
+  headerCard: {
+    minHeight: 92,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surface,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+    ...shadows.soft,
+  },
+  headerIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 20,
+    backgroundColor: palette.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+  },
   title: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#17201A",
+    fontSize: 25,
+    fontWeight: "900",
+    color: palette.ink,
   },
   subtitle: {
-    marginTop: 4,
-    opacity: 0.7,
-    fontSize: 14,
+    marginTop: 3,
+    color: palette.muted,
+    fontSize: 13,
+    fontWeight: "700",
   },
   listContent: {
     paddingBottom: 4,
@@ -208,31 +254,37 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 24,
   },
+  emptyIcon: {
+    width: 70,
+    height: 70,
+    borderRadius: 26,
+    backgroundColor: palette.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
   emptyTitle: {
     fontSize: 22,
-    fontWeight: "700",
+    fontWeight: "900",
+    color: palette.ink,
     textAlign: "center",
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 15,
-    opacity: 0.7,
+    color: palette.muted,
     textAlign: "center",
   },
   card: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    backgroundColor: palette.surface,
+    borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: "#E8ECE9",
-    padding: 12,
+    borderColor: palette.border,
+    padding: 13,
     marginBottom: 12,
-    shadowColor: "#1A3028",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
+    ...shadows.soft,
   },
   avatar: {
     width: 58,

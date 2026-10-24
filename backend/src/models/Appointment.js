@@ -88,7 +88,7 @@ const appointmentSchema = new mongoose.Schema(
       default: [],
     },
   },
-  { timestamps: true }
+  { timestamps: true, collection: "appointments" }
 );
 
 appointmentSchema.index({ requester: 1, provider: 1, status: 1 });

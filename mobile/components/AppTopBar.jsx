@@ -7,10 +7,9 @@ import {
   CHROME_DIVIDER_COLOR,
   CHROME_DIVIDER_HEIGHT,
 } from "../constants/chromeLayout";
+import { palette, radii, shadows } from "../constants/designSystem";
 import { useUser } from "../contexts/UserContext";
 import ThemedText from "./ThemedText";
-
-const GREEN = "#3DB85C";
 
 export default function AppTopBar({
   title,
@@ -79,7 +78,7 @@ export default function AppTopBar({
               {user ? (
                 <Image source={{ uri: avatarUri }} style={styles.profileImage} />
               ) : (
-                <Ionicons name="person-outline" size={22} color="#2E3830" />
+                <Ionicons name="person-outline" size={21} color={palette.text} />
               )}
             </TouchableOpacity>
             {user ? <View style={styles.profileDot} /> : null}
@@ -96,7 +95,7 @@ export default function AppTopBar({
               activeOpacity={0.82}
               onPress={handleBackPress}
             >
-              <Ionicons name="chevron-back" size={24} color="#19201B" />
+              <Ionicons name="chevron-back" size={23} color={palette.ink} />
             </TouchableOpacity>
 
             {centerContent ? (
@@ -124,7 +123,7 @@ export default function AppTopBar({
 
 const styles = StyleSheet.create({
   wrapper: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: palette.surface,
     borderBottomWidth: CHROME_DIVIDER_HEIGHT,
     borderBottomColor: CHROME_DIVIDER_COLOR,
   },
@@ -137,19 +136,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 18,
-    paddingTop: 0,
-    paddingBottom: 8,
+    paddingHorizontal: 16,
+    paddingTop: 2,
+    paddingBottom: 10,
   },
   brandWrap: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
   },
   brandText: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: "800",
-    color: GREEN,
-    letterSpacing: 0.2,
+    color: palette.primary,
+    letterSpacing: -0.4,
   },
   headerActions: {
     flexDirection: "row",
@@ -160,24 +160,20 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   iconButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#FFFFFF",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: palette.surface,
     borderWidth: 1,
-    borderColor: "#FFFFFF",
+    borderColor: palette.border,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+    ...shadows.soft,
   },
   profileImage: {
-    width: 42,
-    height: 42,
+    width: 40,
+    height: 40,
   },
   profileDot: {
     position: "absolute",
@@ -186,7 +182,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: GREEN,
+    backgroundColor: palette.primary,
     borderWidth: 2,
     borderColor: "#FFFFFF",
     zIndex: 2,
@@ -196,23 +192,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 12,
+    paddingTop: 6,
+    paddingBottom: 10,
   },
   backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#F6F8F6",
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
+    backgroundColor: palette.primaryTint,
+    borderWidth: 1,
+    borderColor: palette.border,
     alignItems: "center",
     justifyContent: "center",
   },
   title: {
     flex: 1,
     textAlign: "center",
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: "800",
-    color: "#17201A",
+    color: palette.ink,
     marginHorizontal: 10,
   },
   centerContentButton: {
@@ -222,6 +220,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   spacer: {
-    width: 42,
+    width: 40,
   },
 });

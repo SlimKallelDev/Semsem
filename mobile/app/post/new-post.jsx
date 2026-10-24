@@ -23,6 +23,11 @@ import ThemedText from "../../components/ThemedText";
 import ThemedView from "../../components/ThemedView";
 import { DEFAULT_CURRENCY } from "../../constants/currencies";
 import {
+  palette,
+  radii,
+  shadows,
+} from "../../constants/designSystem";
+import {
   resolveCountryName,
   resolveGovernorateForCountry,
 } from "../../constants/governorates";
@@ -93,6 +98,18 @@ export default function NewPostScreen() {
     const selected = new Set(selectedPetIds.map((id) => String(id)));
     return ownedPets.filter((pet) => selected.has(String(getEntityId(pet))));
   }, [ownedPets, selectedPetIds]);
+  const selectedPetImages = useMemo(
+    () =>
+      [
+        ...new Set(
+          selectedPets
+            .map((pet) => pet?.image || pet?.images?.[0] || "")
+            .map((uri) => String(uri || "").trim())
+            .filter(Boolean)
+        ),
+      ].slice(0, MAX_IMAGES),
+    [selectedPets]
+  );
   const derivedPetType = useMemo(() => {
     const typeParts = selectedPets
       .map((pet) => titleCase(pet?.type))
@@ -359,13 +376,14 @@ export default function NewPostScreen() {
 
     try {
       setSubmitting(true);
+      const postImages = images.length > 0 ? images : selectedPetImages;
 
       await createPost({
         title: title.trim(),
         type,
         description: description.trim(),
-        images,
-        pet_type: derivedPetType,
+        images: postImages,
+        petType: derivedPetType,
         ...(isSalePost
           ? {
               price: normalizedSalePrice,
@@ -660,6 +678,11 @@ export default function NewPostScreen() {
             <ThemedText style={styles.imageCountText}>
               {images.length}/{MAX_IMAGES} selected
             </ThemedText>
+            {images.length === 0 && selectedPetImages.length > 0 ? (
+              <ThemedText style={styles.helperText}>
+                The selected pet photo will be used automatically.
+              </ThemedText>
+            ) : null}
 
             <View style={styles.imageButtonsRow}>
               <TouchableOpacity
@@ -735,16 +758,19 @@ export default function NewPostScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: palette.surface,
   },
   container: {
     flex: 1,
-    backgroundColor: "#F4F6F4",
+    backgroundColor: palette.background,
   },
   flex: {
     flex: 1,
   },
   content: {
+    width: "100%",
+    maxWidth: 680,
+    alignSelf: "center",
     padding: 16,
     paddingBottom: 40,
   },
@@ -764,11 +790,12 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    backgroundColor: "#fff",
+    borderColor: palette.borderStrong,
+    borderRadius: radii.md,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    backgroundColor: palette.surface,
+    color: palette.ink,
   },
   typeSelectWrap: {
     marginBottom: 4,
@@ -848,11 +875,12 @@ const styles = StyleSheet.create({
   },
   petPickerPanel: {
     borderWidth: 1,
-    borderColor: "#DDE8E1",
-    borderRadius: 16,
-    backgroundColor: "#FFFFFF",
-    padding: 10,
+    borderColor: palette.border,
+    borderRadius: radii.lg,
+    backgroundColor: palette.surface,
+    padding: 12,
     marginBottom: 8,
+    ...shadows.soft,
   },
   petPickerMessage: {
     minHeight: 44,
@@ -997,16 +1025,17 @@ const styles = StyleSheet.create({
   },
   imageActionButton: {
     flex: 1,
-    backgroundColor: "#f2f2f2",
-    borderRadius: 12,
+    backgroundColor: palette.primaryTint,
+    borderRadius: radii.md,
     paddingVertical: 12,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: palette.borderStrong,
   },
   imageActionButtonText: {
     fontWeight: "700",
+    color: palette.primaryStrong,
   },
   previewList: {
     flexDirection: "row",
@@ -1039,11 +1068,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   submitButton: {
-    backgroundColor: "#4CAF50",
+    minHeight: 54,
+    backgroundColor: palette.primary,
     paddingVertical: 14,
-    borderRadius: 10,
+    borderRadius: radii.md,
     alignItems: "center",
     marginTop: 24,
+    ...shadows.floating,
   },
   disabledButton: {
     opacity: 0.7,

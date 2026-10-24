@@ -37,7 +37,7 @@ const createComment = async (req, res, next) => {
 
     const comment = await Comment.create({ post, user: finalUserId, text: text.trim() });
 
-    postExists.comments_count = await Comment.countDocuments({ post });
+    postExists.commentsCount = await Comment.countDocuments({ post });
     await postExists.save();
 
     const populatedComment = await Comment.findById(comment._id)
@@ -165,7 +165,7 @@ const deleteComment = async (req, res, next) => {
 
     const post = await Post.findById(comment.post);
     if (post) {
-      post.comments_count = await Comment.countDocuments({ post: comment.post });
+      post.commentsCount = await Comment.countDocuments({ post: comment.post });
       await post.save();
     }
 

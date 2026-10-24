@@ -1,14 +1,26 @@
 // mobile/app/_layout.jsx
 import { Stack } from "expo-router";
 import { useEffect } from "react";
-import { Image, StyleSheet, View } from "react-native";
+import { Image, Platform, StatusBar, StyleSheet, View } from "react-native";
+import * as SplashScreen from "expo-splash-screen";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { UserProvider } from "../contexts/UserContext";
 import { useUser } from "../contexts/UserContext";
 import { preloadLocationSearchOptions } from "../constants/locationOptions";
+import { palette } from "../constants/designSystem";
+
+if (Platform.OS !== "web") {
+  SplashScreen.preventAutoHideAsync().catch(() => {});
+}
 
 function AppBootstrap() {
   const { initializing } = useUser();
+
+  useEffect(() => {
+    if (!initializing && Platform.OS !== "web") {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [initializing]);
 
   useEffect(() => {
     const preloadTimer = setTimeout(() => {
@@ -34,7 +46,18 @@ function AppBootstrap() {
     );
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <>
+      <StatusBar barStyle="dark-content" backgroundColor={palette.surface} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: "slide_from_right",
+          contentStyle: { backgroundColor: palette.background },
+        }}
+      />
+    </>
+  );
 }
 
 export default function RootLayout() {
@@ -50,7 +73,7 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   splashContainer: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: palette.surface,
     alignItems: "center",
     justifyContent: "center",
   },

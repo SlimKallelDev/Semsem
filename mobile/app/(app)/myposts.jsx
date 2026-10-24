@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   RefreshControl,
@@ -13,11 +14,19 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
 import ThemedText from "../../components/ThemedText";
+import {
+  palette,
+  radii,
+  shadows,
+} from "../../constants/designSystem";
 import { getPostTypeLabel } from "../../constants/postTypes";
 import { useUser } from "../../contexts/UserContext";
-import { getMyPosts } from "../../services/postService";
+import {
+  getMyPosts,
+  updatePostStatus,
+} from "../../services/postService";
 
-const GREEN = "#3DB85C";
+const GREEN = palette.primary;
 
 function formatDate(value) {
   if (!value) return "";
@@ -37,14 +46,15 @@ function capitalize(str) {
 
 const STATUS_STYLES = {
   published: { bg: "#E8F8EE", text: GREEN },
+  resolved: { bg: "#EAF2FF", text: "#356DB2" },
   blocked: { bg: "#FEECEC", text: "#D63031" },
 };
 
 function normalizePostStatus(status) {
   const value = String(status || "published").toLowerCase();
-  return ["blocked", "rejected", "archived"].includes(value)
-    ? "blocked"
-    : "published";
+  if (value === "resolved") return "resolved";
+  if (["blocked", "rejected", "archived"].includes(value)) return "blocked";
+  return "published";
 }
 
 function statusStyle(status) {
@@ -63,7 +73,7 @@ function typeColor(type) {
   return TYPE_COLORS[(type || "").toLowerCase()] || GREEN;
 }
 
-function PostRow({ item }) {
+function PostRow({ item, onStatusChange, statusUpdating }) {
   const postId = item?._id || item?.id;
   const imageUri =
     item?.image ||
@@ -73,14 +83,20 @@ function PostRow({ item }) {
   const sStyle = statusStyle(item?.status);
   const displayStatus = normalizePostStatus(item?.status);
   const isBlocked = displayStatus === "blocked";
+  const isResolved = displayStatus === "resolved";
+  const canOpen = displayStatus === "published";
   const tColor = typeColor(item?.type);
 
   return (
     <TouchableOpacity
       activeOpacity={0.88}
-      style={[styles.card, isBlocked && styles.cardBlocked]}
+      style={[
+        styles.card,
+        isBlocked && styles.cardBlocked,
+        isResolved && styles.cardResolved,
+      ]}
       disabled={isBlocked}
-      onPress={() => !isBlocked && postId && router.push(`/post/${postId}`)}
+      onPress={() => canOpen && postId && router.push(`/post/${postId}`)}
     >
       <Image source={{ uri: imageUri }} style={styles.cardImage} />
 
@@ -123,7 +139,7 @@ function PostRow({ item }) {
           <View style={styles.likesBlock}>
             <Ionicons name="heart" size={13} color="#E05555" />
             <ThemedText style={styles.likesText}>
-              {item?.likes_count || 0} likes
+              {item?.likesCount || 0} likes
             </ThemedText>
           </View>
           <ThemedText style={styles.dateText}>
@@ -137,10 +153,26 @@ function PostRow({ item }) {
         style={styles.menuBtn}
         activeOpacity={0.7}
         disabled={isBlocked}
-        onPress={() => !isBlocked && postId && router.push(`/post/${postId}`)}
+        onPress={() => onStatusChange?.(item)}
         hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
       >
-        <Ionicons name="ellipsis-vertical" size={18} color="#B0BAB5" />
+        {statusUpdating ? (
+          <ActivityIndicator size="small" color={GREEN} />
+        ) : (
+          <Ionicons
+            name={
+              isBlocked
+                ? "lock-closed-outline"
+                : isResolved
+                ? "refresh-circle-outline"
+                : "checkmark-circle-outline"
+            }
+            size={22}
+            color={
+              isBlocked ? "#B0BAB5" : isResolved ? "#356DB2" : GREEN
+            }
+          />
+        )}
       </TouchableOpacity>
     </TouchableOpacity>
   );
@@ -151,12 +183,14 @@ function StatsRow({ posts }) {
   const active = posts.filter(
     (p) => normalizePostStatus(p?.status) === "published"
   ).length;
-  const likes = posts.reduce((sum, p) => sum + (p?.likes_count || 0), 0);
+  const resolved = posts.filter(
+    (p) => normalizePostStatus(p?.status) === "resolved"
+  ).length;
 
   const stats = [
     { value: total, label: "Total" },
     { value: active, label: "Published" },
-    { value: likes, label: "Likes" },
+    { value: resolved, label: "Resolved" },
   ];
 
   return (
@@ -182,6 +216,7 @@ export default function MyPosts({ embedded = false, onCountChange } = {}) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [statusUpdatingId, setStatusUpdatingId] = useState(null);
 
   const loadMyPosts = useCallback(async () => {
     if (!userId) {
@@ -214,6 +249,50 @@ export default function MyPosts({ embedded = false, onCountChange } = {}) {
     }
   }, [embedded, initializing, userId]);
 
+  const handleStatusChange = (post) => {
+    const postId = post?._id || post?.id;
+    if (!postId || statusUpdatingId) return;
+
+    const currentStatus = normalizePostStatus(post?.status);
+    const nextStatus =
+      currentStatus === "resolved" ? "published" : "resolved";
+    const resolving = nextStatus === "resolved";
+
+    Alert.alert(
+      resolving ? "Mark as resolved" : "Publish again",
+      resolving
+        ? "This post will no longer appear on the home feed."
+        : "This post will appear on the home feed again.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: resolving ? "Mark resolved" : "Publish",
+          onPress: async () => {
+            try {
+              setStatusUpdatingId(String(postId));
+              const updatedPost = await updatePostStatus(postId, nextStatus);
+              setPosts((current) =>
+                current.map((item) =>
+                  String(item?._id || item?.id) === String(postId)
+                    ? { ...item, ...updatedPost }
+                    : item
+                )
+              );
+            } catch (error) {
+              console.log("Update post status error:", error.message);
+              Alert.alert(
+                "Error",
+                error.message || "Failed to update post status"
+              );
+            } finally {
+              setStatusUpdatingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (loading) {
     return (
       <SafeAreaView
@@ -237,7 +316,16 @@ export default function MyPosts({ embedded = false, onCountChange } = {}) {
       <FlatList
         data={posts}
         keyExtractor={(item) => item._id || item.id}
-        renderItem={({ item }) => <PostRow item={item} />}
+        renderItem={({ item }) => (
+          <PostRow
+            item={item}
+            onStatusChange={handleStatusChange}
+            statusUpdating={
+              String(statusUpdatingId || "") ===
+              String(item?._id || item?.id || "")
+            }
+          />
+        )}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -256,7 +344,12 @@ export default function MyPosts({ embedded = false, onCountChange } = {}) {
         ListHeaderComponent={!embedded ? (
           <>
             <View style={styles.pageHeader}>
-              <ThemedText style={styles.pageTitle}>My Posts</ThemedText>
+              <View style={styles.pageHeaderText}>
+                <ThemedText style={styles.pageTitle}>My Posts</ThemedText>
+                <ThemedText style={styles.pageSubtitle}>
+                  Manage published, resolved, and moderated posts
+                </ThemedText>
+              </View>
               <TouchableOpacity
                 style={styles.addBtn}
                 activeOpacity={0.85}
@@ -285,7 +378,7 @@ export default function MyPosts({ embedded = false, onCountChange } = {}) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: "#F4F6F4",
+    backgroundColor: palette.background,
   },
   embeddedSafe: {
     backgroundColor: "transparent",
@@ -308,36 +401,40 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingTop: 10,
     paddingBottom: 14,
+    gap: 12,
+  },
+  pageHeaderText: {
+    flex: 1,
   },
   pageTitle: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#131F17",
+    color: palette.ink,
     letterSpacing: -0.4,
+  },
+  pageSubtitle: {
+    marginTop: 3,
+    color: palette.muted,
+    fontSize: 12.5,
+    fontWeight: "600",
   },
   addBtn: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: radii.md,
     backgroundColor: GREEN,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: GREEN,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...shadows.floating,
   },
   statsRow: {
     flexDirection: "row",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    backgroundColor: palette.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: palette.border,
     marginBottom: 18,
-    shadowColor: "#1A3028",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 2,
+    ...shadows.soft,
     overflow: "hidden",
   },
   statBox: {
@@ -362,24 +459,26 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    backgroundColor: palette.surface,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: palette.border,
     padding: 14,
     marginBottom: 12,
-    shadowColor: "#1A3028",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 2,
+    ...shadows.soft,
   },
   cardBlocked: {
     opacity: 0.72,
     borderColor: "#E7BABA",
   },
+  cardResolved: {
+    borderWidth: 1,
+    borderColor: "#C9DDF7",
+  },
   cardImage: {
     width: 78,
     height: 78,
-    borderRadius: 14,
+    borderRadius: radii.md,
     backgroundColor: "#E6EDE8",
   },
   cardInfo: {
@@ -391,7 +490,7 @@ const styles = StyleSheet.create({
   postTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#131F17",
+    color: palette.ink,
     lineHeight: 22,
   },
   tagsRow: {
@@ -449,11 +548,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#2C3A31",
+    color: palette.ink,
   },
   emptyText: {
     fontSize: 14,
-    color: "#8E9B93",
+    color: palette.muted,
     textAlign: "center",
     lineHeight: 20,
   },

@@ -18,7 +18,7 @@ const messageSchema = new mongoose.Schema(
       trim: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true, collection: "messages" }
 );
 
 messageSchema.index({ conversation: 1, createdAt: 1 });

@@ -49,6 +49,7 @@ Thumbs.db
 .cache/
 .tmp/
 temp/
+tmp/
 
 ############################
 # IDE FILES
@@ -67,4 +68,3 @@ mobile/.git/
 commands.txt
 files.txt
 rapport/
-tmp/

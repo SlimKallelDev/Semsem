@@ -27,7 +27,7 @@ const userReviewSchema = new mongoose.Schema(
       maxlength: 500,
     },
   },
-  { timestamps: true }
+  { timestamps: true, collection: "userreviews" }
 );
 
 userReviewSchema.index({ targetUser: 1, reviewer: 1 }, { unique: true });

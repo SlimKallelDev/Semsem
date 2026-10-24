@@ -69,6 +69,15 @@ const normalizeLocation = (location = {}) => ({
   country: String(location?.country || "").trim(),
 });
 
+const resolvePetLocation = (payload = {}) =>
+  normalizeLocation({
+    country: payload.country ?? payload.location?.country,
+    governorate:
+      payload.governorate ??
+      payload.location?.governorate ??
+      payload.location?.city,
+  });
+
 const buildPetFormData = (payload = {}) => {
   const formData = new FormData();
 
@@ -78,8 +87,14 @@ const buildPetFormData = (payload = {}) => {
   appendField(formData, "breed", payload.breed);
   appendField(formData, "date", payload.date);
   appendField(formData, "description", payload.description);
-  if (payload.location !== undefined) {
-    formData.append("location", JSON.stringify(normalizeLocation(payload.location)));
+  const hasLocation =
+    payload.country !== undefined ||
+    payload.governorate !== undefined ||
+    payload.location !== undefined;
+  if (hasLocation) {
+    const location = resolvePetLocation(payload);
+    appendField(formData, "country", location.country);
+    appendField(formData, "governorate", location.governorate);
   }
   if (payload.careRecord !== undefined) {
     formData.append("careRecord", JSON.stringify(payload.careRecord || {}));
@@ -133,11 +148,10 @@ export const getPetsByOwner = async (ownerId) => {
 };
 
 export const createPet = async (petData) => {
+  const location = resolvePetLocation(petData);
   const normalizedData = {
     ...petData,
-    ...(petData?.location !== undefined
-      ? { location: normalizeLocation(petData.location) }
-      : {}),
+    ...location,
   };
   const payload = buildPetFormData(normalizedData);
 
@@ -146,11 +160,14 @@ export const createPet = async (petData) => {
 };
 
 export const updatePet = async (id, petData) => {
+  const hasLocation =
+    petData?.country !== undefined ||
+    petData?.governorate !== undefined ||
+    petData?.location !== undefined;
+  const location = hasLocation ? resolvePetLocation(petData) : {};
   const normalizedData = {
     ...petData,
-    ...(petData?.location !== undefined
-      ? { location: normalizeLocation(petData.location) }
-      : {}),
+    ...location,
   };
   const payload = buildPetFormData(normalizedData);
 

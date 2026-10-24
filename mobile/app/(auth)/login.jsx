@@ -16,11 +16,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { Link, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import ThemedView from "../../components/ThemedView";
 import Spacer from "../../components/Spacer";
 import ThemedText from "../../components/ThemedText";
 import ThemedTextInput from "../../components/ThemedTextInput";
 import ThemedButton from "../../components/ThemedButton";
+import {
+  palette,
+  radii,
+  shadows,
+} from "../../constants/designSystem";
 import { useUser } from "../../contexts/UserContext";
 
 export default function Login() {
@@ -72,7 +76,9 @@ export default function Login() {
         >
           <Ionicons name="chevron-back" size={23} color="#19201B" />
         </TouchableOpacity>
-        <Text style={styles.brandText}>Semsem</Text>
+        <View style={styles.brandWrap}>
+          <Text style={styles.brandText}>Semsem</Text>
+        </View>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -88,8 +94,11 @@ export default function Login() {
             keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
           >
-            <ThemedView>
-              <Spacer height={34} />
+            <View style={styles.authCard}>
+              <View style={styles.heroIcon}>
+                <Ionicons name="paw" size={26} color={palette.primaryStrong} />
+              </View>
+              <Spacer height={16} />
               <ThemedText type="title" style={styles.title}>
                 Welcome Back!
               </ThemedText>
@@ -97,7 +106,7 @@ export default function Login() {
                 Login to connect with pet lovers
               </ThemedText>
 
-              <Spacer height={40} />
+              <Spacer height={30} />
 
               <ThemedTextInput
                 placeholder="Email address"
@@ -155,8 +164,7 @@ export default function Login() {
                 </Link>
               </ThemedText>
 
-              <Spacer height={40} />
-            </ThemedView>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </TouchableWithoutFeedback>
@@ -165,49 +173,90 @@ export default function Login() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F4F6F4" },
+  safeArea: { flex: 1, backgroundColor: palette.background },
   flex: { flex: 1 },
   header: {
-    minHeight: 52,
+    minHeight: 58,
     paddingHorizontal: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
   backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#FFFFFF",
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
+    backgroundColor: palette.surface,
     borderWidth: 1,
-    borderColor: "#E8ECE9",
+    borderColor: palette.border,
     alignItems: "center",
     justifyContent: "center",
+    ...shadows.soft,
+  },
+  brandWrap: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   brandText: {
-    color: "#3DB85C",
-    fontSize: 26,
+    color: palette.primary,
+    fontSize: 25,
     fontWeight: "800",
+    letterSpacing: -0.4,
   },
   headerSpacer: {
     width: 42,
   },
-  container: { flexGrow: 1, paddingHorizontal: 24 },
-  title: { textAlign: "center", fontSize: 28 },
-  subtitle: { textAlign: "center", marginTop: 8, opacity: 0.8 },
+  container: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 28,
+  },
+  authCard: {
+    width: "100%",
+    maxWidth: 520,
+    alignSelf: "center",
+    backgroundColor: palette.surface,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: palette.border,
+    paddingHorizontal: 22,
+    paddingVertical: 28,
+    ...shadows.card,
+  },
+  heroIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 20,
+    backgroundColor: palette.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+  },
+  title: { textAlign: "center" },
+  subtitle: {
+    textAlign: "center",
+    marginTop: 8,
+    color: palette.muted,
+  },
   input: { width: "100%" },
   buttonDisabled: { opacity: 0.7 },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   errorText: {
-    color: "#cc475a",
+    color: palette.danger,
     textAlign: "center",
     backgroundColor: "rgba(204,71,90,0.12)",
     padding: 12,
-    borderRadius: 8,
+    borderRadius: radii.md,
     borderWidth: 1,
     borderColor: "rgba(204,71,90,0.3)",
   },
-  link: { textAlign: "center", fontSize: 15 },
-  linkInline: { fontWeight: "600" },
+  link: {
+    textAlign: "center",
+    fontSize: 15,
+    color: palette.primaryStrong,
+    fontWeight: "700",
+  },
+  linkInline: { fontWeight: "800", color: palette.primaryStrong },
   footer: { textAlign: "center", fontSize: 15 },
 });

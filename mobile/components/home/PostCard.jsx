@@ -107,12 +107,12 @@ function formatStatusLabel(status) {
 }
 
 function parseLikesCount(post) {
-  const count = Number(post?.likes_count);
+  const count = Number(post?.likesCount);
   return Number.isFinite(count) ? count : 0;
 }
 
 function parseCommentsCount(post) {
-  const count = Number(post?.comments_count);
+  const count = Number(post?.commentsCount);
   return Number.isFinite(count) ? count : 0;
 }
 
@@ -172,7 +172,7 @@ export default function PostCard({ post, inGroupedSection = false }) {
   const categoryBadgeLabel = formatSaleBadgeLabel(post, categoryMeta);
   const statusMeta = getStatusMeta(post.status);
   const isVeterinaryAuthor = isVeterinaryUser(post?.user);
-  const petType = post.pet_type || post.petType || "Unknown";
+  const petType = post.petType || "Unknown";
   const postId = post?._id || post?.id;
   const postImageUri = getPostImageUri(post);
   const authorId = useMemo(() => getEntityId(post?.user), [post?.user]);
@@ -213,11 +213,11 @@ export default function PostCard({ post, inGroupedSection = false }) {
 
   useEffect(() => {
     setLikesCount(parseLikesCount(post));
-  }, [post?.likes_count, postId]);
+  }, [post?.likesCount, postId]);
 
   useEffect(() => {
     setCommentsCount(parseCommentsCount(post));
-  }, [post?.comments_count, postId]);
+  }, [post?.commentsCount, postId]);
 
   useEffect(() => {
     let mounted = true;

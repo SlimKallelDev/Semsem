@@ -39,9 +39,8 @@ function getEntityId(value) {
 
 function formatLocation(pet) {
   return [
-    pet?.location?.country || pet?.owner?.country,
-    pet?.location?.governorate ||
-      pet?.location?.city ||
+    pet?.country || pet?.owner?.country,
+    pet?.governorate ||
       pet?.owner?.governorate ||
       pet?.owner?.city,
   ]

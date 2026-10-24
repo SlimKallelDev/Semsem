@@ -24,14 +24,9 @@ const PET_CARD_GAP = 8;
 const PET_SNAP_INTERVAL = PET_CARD_WIDTH + PET_CARD_GAP;
 
 function formatLocation(pet) {
-  if (typeof pet?.location === "string" && pet.location.trim()) {
-    return pet.location.trim();
-  }
-
   return [
-    pet?.location?.country || pet?.owner?.country,
-    pet?.location?.governorate ||
-      pet?.location?.city ||
+    pet?.country || pet?.owner?.country,
+    pet?.governorate ||
       pet?.owner?.governorate ||
       pet?.owner?.city,
   ]

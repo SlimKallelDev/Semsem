@@ -1,21 +1,22 @@
-import { View, useColorScheme , ActivityIndicator } from 'react-native'
-import { Colors } from "../constants/Colors"
-import ThemedView from './ThemedView'
+import { ActivityIndicator, StyleSheet } from "react-native";
+
+import { Colors } from "../constants/Colors";
+import ThemedView from "./ThemedView";
 
 const ThemedLoader = () => {
-
-  const colorScheme = useColorScheme()
-  const theme = Colors[colorScheme] ?? Colors.light
-
   return (
-      <ThemedView style={{
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        }}>
-      <ActivityIndicator size="large" color={theme.text}/>
-      </ThemedView>
-    )
-}
+    <ThemedView style={styles.container}>
+      <ActivityIndicator size="large" color={Colors.primary} />
+    </ThemedView>
+  );
+};
 
-export default ThemedLoader
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+});
+
+export default ThemedLoader;

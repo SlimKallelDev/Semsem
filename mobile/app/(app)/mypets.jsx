@@ -14,10 +14,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 
 import ThemedText from "../../components/ThemedText";
+import {
+  palette,
+  radii,
+  shadows,
+} from "../../constants/designSystem";
 import { useUser } from "../../contexts/UserContext";
 import { deletePet, getPetsByOwner } from "../../services/petService";
 
-const GREEN = "#3DB85C";
+const GREEN = palette.primary;
 
 function formatAge(dateValue) {
   if (!dateValue) return null;
@@ -229,6 +234,9 @@ export default function MyPetsScreen({ embedded = false, onCountChange } = {}) {
           <View style={styles.pageHeader}>
             <View>
               <ThemedText style={styles.pageTitle}>My Pets</ThemedText>
+              <ThemedText style={styles.pageSubtitle}>
+                Profiles and health records for your companions
+              </ThemedText>
             </View>
             <TouchableOpacity
               style={styles.addBtn}
@@ -256,7 +264,7 @@ export default function MyPetsScreen({ embedded = false, onCountChange } = {}) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: "#F4F6F4",
+    backgroundColor: palette.background,
   },
   embeddedSafe: {
     backgroundColor: "transparent",
@@ -279,43 +287,44 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingTop: 10,
     paddingBottom: 14,
+    gap: 12,
   },
   pageTitle: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#131F17",
+    color: palette.ink,
     letterSpacing: -0.4,
+  },
+  pageSubtitle: {
+    marginTop: 3,
+    color: palette.muted,
+    fontSize: 12.5,
+    fontWeight: "600",
   },
   addBtn: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: radii.md,
     backgroundColor: GREEN,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: GREEN,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...shadows.floating,
   },
   card: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    backgroundColor: palette.surface,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: palette.border,
     padding: 14,
     marginBottom: 12,
-    shadowColor: "#1A3028",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 2,
+    ...shadows.soft,
   },
   cardImage: {
     width: 78,
     height: 78,
-    borderRadius: 14,
+    borderRadius: radii.md,
     backgroundColor: "#E6EDE8",
   },
   cardInfo: {
@@ -332,7 +341,7 @@ const styles = StyleSheet.create({
   petName: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#131F17",
+    color: palette.ink,
     flexShrink: 1,
   },
   typeBadge: {
@@ -353,7 +362,7 @@ const styles = StyleSheet.create({
   },
   breed: {
     fontSize: 13,
-    color: "#8E9B93",
+    color: palette.muted,
     marginBottom: 5,
   },
   metaRow: {
@@ -365,7 +374,7 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 12,
-    color: "#8E9B93",
+    color: palette.muted,
   },
   metaGap: {
     marginLeft: 8,
@@ -396,11 +405,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#2C3A31",
+    color: palette.ink,
   },
   emptyText: {
     fontSize: 14,
-    color: "#8E9B93",
+    color: palette.muted,
     textAlign: "center",
     lineHeight: 20,
   },

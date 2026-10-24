@@ -22,23 +22,15 @@ const petSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    location: {
-      governorate: {
-        type: String,
-        trim: true,
-        default: "",
-      },
-      // Legacy field kept for backward compatibility with older records/clients.
-      city: {
-        type: String,
-        trim: true,
-        default: "",
-      },
-      country: {
-        type: String,
-        trim: true,
-        default: "",
-      },
+    country: {
+      type: String,
+      trim: true,
+      required: [true, 'Country is required'],
+    },
+    governorate: {
+      type: String,
+      trim: true,
+      required: [true, 'Governorate is required'],
     },
     date: {
       type: Date, // e.g. birth or adoption date
@@ -130,11 +122,25 @@ const petSchema = new mongoose.Schema(
       updatedAt: { type: Date, default: Date.now },
     },
   },
-  { timestamps: true }
+  { timestamps: true, collection: 'pets' }
 );
 
+petSchema.pre('init', function normalizeLegacyPetLocation(data) {
+  const legacyLocation = data.location || {};
+
+  if (!data.country && legacyLocation.country) {
+    data.country = legacyLocation.country;
+  }
+  if (!data.governorate) {
+    data.governorate =
+      legacyLocation.governorate || legacyLocation.city || data.city || '';
+  }
+  delete data.location;
+  delete data.city;
+});
+
 petSchema.index({ owner: 1 }); // Fast lookup: all pets of a user
-petSchema.index({ "location.country": 1, "location.governorate": 1 });
+petSchema.index({ country: 1, governorate: 1 });
 
 module.exports = mongoose.model('Pet', petSchema);
 

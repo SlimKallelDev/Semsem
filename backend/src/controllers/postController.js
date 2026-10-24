@@ -297,6 +297,9 @@ const hydratePostImages = (post) => {
   return normalizePostLocationDocument(post);
 };
 
+const getPetTypeInput = (body = {}) =>
+  body.petType !== undefined ? body.petType : body.pet_type;
+
 const getAuthorProfileType = async (userId) => {
   const author = await User.findById(userId).select("profileType");
 
@@ -320,7 +323,8 @@ const buildVisiblePostFilter = async (query = {}) => ({
 
 const createPost = async (req, res, next) => {
   try {
-    const { type, title, description, pet_type, location, price, currency } = req.body;
+    const { type, title, description, location, price, currency } = req.body;
+    const petType = getPetTypeInput(req.body);
     const normalizedType = normalizePostType(type);
     const userId = req.user?.userId;
 
@@ -375,7 +379,7 @@ const createPost = async (req, res, next) => {
       description: description.trim(),
       image: images[0] || "",
       images,
-      pet_type: String(pet_type || "").trim(),
+      petType: String(petType || "").trim(),
       price: saleDetails.price,
       currency: saleDetails.currency,
       location: normalizedLocation,
@@ -469,6 +473,51 @@ const getMyPosts = async (req, res, next) => {
   }
 };
 
+const updateOwnPostStatus = async (req, res, next) => {
+  try {
+    const requestedStatus = String(req.body?.status || "")
+      .trim()
+      .toLowerCase();
+    const allowedStatuses = [
+      POST_STATUS.PUBLISHED,
+      POST_STATUS.RESOLVED,
+    ];
+
+    if (!allowedStatuses.includes(requestedStatus)) {
+      return res.status(400).json({
+        message: "Status must be published or resolved",
+      });
+    }
+
+    const post = await Post.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    if (String(post.user) !== String(req.user.userId)) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to update this post status" });
+    }
+
+    if (post.status === POST_STATUS.BLOCKED) {
+      return res.status(403).json({
+        message: "A blocked post can only be restored by an administrator",
+      });
+    }
+
+    post.status = requestedStatus;
+    await post.save();
+    await post.populate("user", USER_PUBLIC_FIELDS);
+    hydratePostImages(post);
+
+    return res.status(200).json(post);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const updatePost = async (req, res, next) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -477,13 +526,14 @@ const updatePost = async (req, res, next) => {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    if (post.user.toString() !== req.user.userId) {
+    if (String(post.user) !== String(req.user.userId)) {
       return res
         .status(403)
         .json({ message: "Not authorized to update this post" });
     }
 
-    const { type, title, description, pet_type, location, price, currency } = req.body;
+    const { type, title, description, location, price, currency } = req.body;
+    const petType = getPetTypeInput(req.body);
     const profileType = await getAuthorProfileType(req.user.userId);
 
     if (type !== undefined) {
@@ -520,7 +570,7 @@ const updatePost = async (req, res, next) => {
       post.images = images;
       post.image = images[0] || "";
     }
-    if (pet_type !== undefined) post.pet_type = String(pet_type || "").trim();
+    if (petType !== undefined) post.petType = String(petType || "").trim();
 
     if (type !== undefined || price !== undefined || currency !== undefined) {
       const saleDetails = resolveSaleDetails({
@@ -563,7 +613,7 @@ const deletePost = async (req, res, next) => {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    if (post.user.toString() !== req.user.userId) {
+    if (String(post.user) !== String(req.user.userId)) {
       return res
         .status(403)
         .json({ message: "Not authorized to delete this post" });
@@ -583,6 +633,7 @@ module.exports = {
   getPostById,
   getPostsByUser,
   getMyPosts,
+  updateOwnPostStatus,
   updatePost,
   deletePost,
 };

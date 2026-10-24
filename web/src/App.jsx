@@ -62,6 +62,7 @@ const STATUS_LABELS = {
   active: "Active",
   blocked: "Blocked",
   published: "Published",
+  resolved: "Resolved",
   suspended: "Suspended",
   banned: "Banned",
   pending: "Pending",
@@ -368,7 +369,7 @@ function DashboardPage({ request }) {
   const stats = [
     { label: "Users", value: data?.counts?.users, icon: Users, detail: `${data?.counts?.activeUsers || 0} active · ${data?.counts?.blockedUsers || 0} blocked` },
     { label: "Pets", value: data?.counts?.pets, icon: PawPrint, detail: "Registered profiles" },
-    { label: "Posts", value: data?.counts?.posts, icon: FileText, detail: `${data?.counts?.publishedPosts || 0} published · ${data?.counts?.blockedPosts || 0} blocked` },
+    { label: "Posts", value: data?.counts?.posts, icon: FileText, detail: `${data?.counts?.publishedPosts || 0} published · ${data?.counts?.resolvedPosts || 0} resolved · ${data?.counts?.blockedPosts || 0} blocked` },
     { label: "Appointments", value: data?.counts?.appointments, icon: CalendarDays, detail: `${data?.counts?.pendingAppointments || 0} pending` },
     { label: "Reports", value: data?.counts?.reports, icon: Flag, detail: `${data?.counts?.pendingReports || 0} to review` },
   ];
@@ -712,7 +713,7 @@ function UserRows({ user, currentUser, expanded, pets, petsLoading, deleting, up
                     <article className="pet-item" key={pet._id}>
                       {pet.image || pet.images?.[0] ? <img src={pet.image || pet.images[0]} alt="" /> : <span className="pet-image-fallback"><PawPrint size={19} /></span>}
                       <div><strong>{pet.name}</strong><small>{pet.type}{pet.breed ? ` · ${pet.breed}` : ""}</small></div>
-                      <span>{[pet.location?.governorate || pet.location?.city, pet.location?.country].filter(Boolean).join(", ") || "Location unavailable"}</span>
+                      <span>{[pet.governorate, pet.country].filter(Boolean).join(", ") || "Location unavailable"}</span>
                     </article>
                   ))}
                 </div>
@@ -729,8 +730,8 @@ function PostEditModal({ post, onClose, onSave, saving }) {
   const [form, setForm] = useState({
     title: post.title || "",
     description: post.description || "",
-    status: ["blocked", "rejected", "archived"].includes(post.status)
-      ? "blocked"
+    status: ["published", "resolved", "blocked"].includes(post.status)
+      ? post.status
       : "published",
   });
 
@@ -772,6 +773,7 @@ function PostEditModal({ post, onClose, onSave, saving }) {
             onChange={(event) => setForm({ ...form, status: event.target.value })}
           >
             <option value="published">Published</option>
+            <option value="resolved">Resolved</option>
             <option value="blocked">Blocked</option>
           </select>
         </label>
@@ -917,7 +919,7 @@ function PostsPage({ request, notify }) {
       <PageHeader
         eyebrow="Community content"
         title="Post management"
-        description={`${data.total} posts published on Semsem.`}
+        description={`${data.total} posts recorded on Semsem.`}
       />
       <section className="data-section">
         <div className="table-toolbar">
@@ -935,6 +937,7 @@ function PostsPage({ request, notify }) {
           <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
             <option value="">All statuses</option>
             <option value="published">Published</option>
+            <option value="resolved">Resolved</option>
             <option value="blocked">Blocked</option>
           </select>
         </div>
@@ -1095,7 +1098,14 @@ function AppointmentsPage({ request, notify }) {
 }
 
 function ReportEditModal({ report, onClose, onSave, saving }) {
-  const [form, setForm] = useState({ status: report.status, postStatus: report.post?.status === "blocked" ? "blocked" : "published" });
+  const [form, setForm] = useState({
+    status: report.status,
+    postStatus: ["published", "resolved", "blocked"].includes(
+      report.post?.status
+    )
+      ? report.post.status
+      : "published",
+  });
   return (
     <Modal
       title="Review report"
@@ -1118,7 +1128,7 @@ function ReportEditModal({ report, onClose, onSave, saving }) {
       </div>
       <div className="form-grid report-form-grid">
         <label>Report decision<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option value="pending">Pending</option><option value="reviewed">Reviewed</option><option value="dismissed">Dismissed</option><option value="actioned">Action taken</option></select></label>
-        <label>Post status<select value={form.postStatus} onChange={(event) => setForm({ ...form, postStatus: event.target.value })} disabled={!report.post}><option value="published">Published</option><option value="blocked">Blocked</option></select></label>
+        <label>Post status<select value={form.postStatus} onChange={(event) => setForm({ ...form, postStatus: event.target.value })} disabled={!report.post}><option value="published">Published</option><option value="resolved">Resolved</option><option value="blocked">Blocked</option></select></label>
       </div>
     </Modal>
   );

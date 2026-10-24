@@ -3,9 +3,14 @@ import { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 
 import { CURRENCY_OPTIONS } from "../constants/currencies";
+import {
+  palette,
+  radii,
+  shadows,
+} from "../constants/designSystem";
 import ThemedText from "./ThemedText";
 
-const GREEN = "#3DB85C";
+const GREEN = palette.primary;
 
 export default function CurrencySelector({
   value,
@@ -40,7 +45,7 @@ export default function CurrencySelector({
         <Ionicons
           name={open ? "chevron-up" : "chevron-down"}
           size={17}
-          color="#6D7A72"
+          color={palette.muted}
         />
       </TouchableOpacity>
 
@@ -84,12 +89,12 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   button: {
-    minHeight: 48,
+    minHeight: 52,
     borderWidth: 1,
-    borderColor: "#DCE3DE",
-    borderRadius: 10,
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
+    borderColor: palette.borderStrong,
+    borderRadius: radii.md,
+    backgroundColor: palette.surface,
+    paddingHorizontal: 14,
     paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
@@ -98,18 +103,19 @@ const styles = StyleSheet.create({
   buttonText: {
     flex: 1,
     marginRight: 8,
-    color: "#17201A",
+    color: palette.ink,
     fontSize: 15,
     fontWeight: "800",
   },
   optionsList: {
     borderWidth: 1,
-    borderColor: "#DDE8E1",
-    borderRadius: 12,
-    backgroundColor: "#FFFFFF",
+    borderColor: palette.border,
+    borderRadius: radii.md,
+    backgroundColor: palette.surface,
     marginTop: 6,
     maxHeight: 258,
     overflow: "hidden",
+    ...shadows.soft,
   },
   optionRow: {
     minHeight: 42,
@@ -120,11 +126,11 @@ const styles = StyleSheet.create({
     borderBottomColor: "#EEF3EF",
   },
   optionRowActive: {
-    backgroundColor: "#F0FBF3",
+    backgroundColor: palette.primaryTint,
   },
   optionCode: {
     width: 38,
-    color: "#17201A",
+    color: palette.ink,
     fontSize: 13,
     fontWeight: "900",
   },
@@ -134,7 +140,7 @@ const styles = StyleSheet.create({
   optionLabel: {
     flex: 1,
     minWidth: 0,
-    color: "#66736C",
+    color: palette.text,
     fontSize: 12.5,
     fontWeight: "700",
     marginRight: 8,

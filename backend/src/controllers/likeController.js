@@ -48,7 +48,7 @@ const likePost = async (req, res, next) => {
       user: finalUserId,
     });
 
-    post.likes_count = await Like.countDocuments({ post: postId });
+    post.likesCount = await Like.countDocuments({ post: postId });
     await post.save();
 
     const populatedLike = await Like.findById(like._id)
@@ -102,7 +102,7 @@ const unlikePost = async (req, res, next) => {
     const post = await Post.findById(postId);
 
     if (post) {
-      post.likes_count = await Like.countDocuments({ post: postId });
+      post.likesCount = await Like.countDocuments({ post: postId });
       await post.save();
     }
 

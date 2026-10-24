@@ -762,7 +762,8 @@ td small {
 }
 
 .status-suspended,
-.status-reviewed {
+.status-reviewed,
+.status-resolved {
   color: #4c5d75;
   background: #e9eef5;
 }

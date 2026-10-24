@@ -11,10 +11,10 @@ import {
   Text,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Link, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import ThemedView from "../../components/ThemedView";
 import Spacer from "../../components/Spacer";
 import ThemedText from "../../components/ThemedText";
 import ThemedTextInput from "../../components/ThemedTextInput";
@@ -26,6 +26,11 @@ import {
   resolveCountryName,
   resolveGovernorateForCountry,
 } from "../../constants/governorates";
+import {
+  palette,
+  radii,
+  shadows,
+} from "../../constants/designSystem";
 
 export default function Register() {
   const [name, setName] = useState("");
@@ -77,6 +82,20 @@ export default function Register() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          activeOpacity={0.82}
+          onPress={() => router.replace("/home")}
+        >
+          <Ionicons name="chevron-back" size={23} color={palette.ink} />
+        </TouchableOpacity>
+        <View style={styles.brandWrap}>
+          <Text style={styles.brandText}>Semsem</Text>
+        </View>
+        <View style={styles.headerSpacer} />
+      </View>
+
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <KeyboardAvoidingView
           style={styles.flex}
@@ -89,8 +108,15 @@ export default function Register() {
             keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
           >
-            <ThemedView>
-              <Spacer height={60} />
+            <View style={styles.authCard}>
+              <View style={styles.heroIcon}>
+                <Ionicons
+                  name="people"
+                  size={27}
+                  color={palette.primaryStrong}
+                />
+              </View>
+              <Spacer height={16} />
 
               <ThemedText type="title" style={styles.title}>
                 Join Our Pet Community
@@ -99,7 +125,7 @@ export default function Register() {
                 Create account and meet new furry friends
               </ThemedText>
 
-              <Spacer height={40} />
+              <Spacer height={30} />
 
               <ThemedTextInput
                 placeholder="Your name / nickname"
@@ -211,8 +237,7 @@ export default function Register() {
                 </Link>
               </ThemedText>
 
-              <Spacer height={40} />
-            </ThemedView>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </TouchableWithoutFeedback>
@@ -221,15 +246,75 @@ export default function Register() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F4F6F4" },
+  safeArea: { flex: 1, backgroundColor: palette.background },
   flex: { flex: 1 },
-  container: { flexGrow: 1, paddingHorizontal: 24 },
-  title: { textAlign: "center", fontSize: 28 },
-  subtitle: { textAlign: "center", marginTop: 8, opacity: 0.8 },
+  header: {
+    minHeight: 58,
+    paddingHorizontal: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
+    backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.border,
+    alignItems: "center",
+    justifyContent: "center",
+    ...shadows.soft,
+  },
+  brandWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  brandText: {
+    color: palette.primary,
+    fontSize: 25,
+    fontWeight: "800",
+    letterSpacing: -0.4,
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  container: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 28,
+  },
+  authCard: {
+    width: "100%",
+    maxWidth: 560,
+    alignSelf: "center",
+    backgroundColor: palette.surface,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: palette.border,
+    paddingHorizontal: 22,
+    paddingVertical: 28,
+    ...shadows.card,
+  },
+  heroIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 20,
+    backgroundColor: palette.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+  },
+  title: { textAlign: "center" },
+  subtitle: {
+    textAlign: "center",
+    marginTop: 8,
+    color: palette.muted,
+  },
   input: { width: "100%" },
   fieldLabel: {
     fontSize: 13,
-    color: "#5E6B61",
+    color: palette.text,
     marginBottom: 8,
     marginLeft: 2,
     fontWeight: "600",
@@ -241,15 +326,15 @@ const styles = StyleSheet.create({
   },
   profileChip: {
     borderWidth: 1.5,
-    borderColor: "#D5E2D9",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    borderColor: palette.borderStrong,
+    backgroundColor: palette.surface,
+    borderRadius: radii.md,
     paddingVertical: 9,
     paddingHorizontal: 12,
   },
   profileChipActive: {
-    borderColor: "#3DB85C",
-    backgroundColor: "#EAF7EE",
+    borderColor: palette.primary,
+    backgroundColor: palette.primarySoft,
   },
   profileChipText: {
     fontSize: 13,
@@ -257,18 +342,18 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   profileChipTextActive: {
-    color: "#2A9448",
+    color: palette.primaryStrong,
     fontWeight: "700",
   },
   locationCard: {
     borderWidth: 1,
-    borderColor: "#DCE7E0",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    borderColor: palette.border,
+    backgroundColor: palette.surfaceMuted,
+    borderRadius: radii.lg,
     padding: 12,
   },
   locationHint: {
-    color: "#6E7B74",
+    color: palette.muted,
     fontSize: 12.5,
     fontWeight: "600",
     lineHeight: 18,
@@ -276,23 +361,23 @@ const styles = StyleSheet.create({
   },
   locationInput: {
     borderWidth: 1,
-    borderColor: "#D5E2D9",
-    backgroundColor: "#FAFCFA",
-    borderRadius: 14,
+    borderColor: palette.borderStrong,
+    backgroundColor: palette.surface,
+    borderRadius: radii.md,
     paddingHorizontal: 14,
     paddingVertical: 13,
   },
   buttonDisabled: { opacity: 0.7 },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   errorText: {
-    color: "#cc475a",
+    color: palette.danger,
     textAlign: "center",
     backgroundColor: "rgba(204,71,90,0.12)",
     padding: 12,
-    borderRadius: 8,
+    borderRadius: radii.md,
     borderWidth: 1,
     borderColor: "rgba(204,71,90,0.3)",
   },
-  linkInline: { fontWeight: "600" },
+  linkInline: { fontWeight: "800", color: palette.primaryStrong },
   footer: { textAlign: "center", fontSize: 15 },
 });

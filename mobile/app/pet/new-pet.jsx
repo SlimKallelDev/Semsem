@@ -24,6 +24,11 @@ import {
   resolveCountryName,
   resolveGovernorateForCountry,
 } from "../../constants/governorates";
+import {
+  palette,
+  radii,
+  shadows,
+} from "../../constants/designSystem";
 import { useUser } from "../../contexts/UserContext";
 import { createPet } from "../../services/petService";
 
@@ -232,10 +237,8 @@ export default function NewPetScreen() {
         images,
         date: date ? date.toISOString() : undefined,
         description: description.trim(),
-        location: {
-          governorate: normalizedGovernorate.trim(),
-          country: normalizedCountry.trim(),
-        },
+        governorate: normalizedGovernorate.trim(),
+        country: normalizedCountry.trim(),
         careRecord: {
           identityProfile: {
             petName: name.trim(),
@@ -621,6 +624,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    width: "100%",
+    maxWidth: 680,
+    alignSelf: "center",
     paddingHorizontal: 16,
     paddingTop: 14,
   },
@@ -638,13 +644,14 @@ const styles = StyleSheet.create({
     color: "#7D8A82",
   },
   section: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    backgroundColor: palette.surface,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: "#E6EDE8",
     paddingHorizontal: 14,
     paddingVertical: 14,
     marginBottom: 12,
+    ...shadows.soft,
   },
   sectionTitle: {
     fontSize: 16,
@@ -669,7 +676,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: "#DCE3DE",
-    borderRadius: 10,
+    borderRadius: radii.md,
     paddingHorizontal: 12,
     paddingVertical: 11,
     backgroundColor: "#FFFFFF",
@@ -835,11 +842,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   submitButton: {
+    minHeight: 54,
     backgroundColor: GREEN,
     paddingVertical: 14,
-    borderRadius: 10,
+    borderRadius: radii.md,
     alignItems: "center",
     marginTop: 8,
+    ...shadows.floating,
   },
   disabledButton: {
     opacity: 0.7,

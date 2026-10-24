@@ -172,7 +172,7 @@ export default function ProfileScreen() {
   const postCount = posts.length;
   const petsCount = pets.length;
   const likesCount = posts.reduce(
-    (sum, item) => sum + Number(item?.likes_count || 0),
+    (sum, item) => sum + Number(item?.likesCount || 0),
     0
   );
 

@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "create-admin": "node scripts/createAdmin.js"
+    "create-admin": "node scripts/createAdmin.js",
+    "audit-class-diagram": "node scripts/auditClassDiagram.js",
+    "migrate-class-diagram": "node scripts/migrateClassDiagramFields.js"
   },
   "keywords": [],
   "author": "",

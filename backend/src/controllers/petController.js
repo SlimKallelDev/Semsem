@@ -25,16 +25,13 @@ const normalizeLocation = (location = {}) => ({
 const normalizePetLocationDocument = (pet) => {
   if (!pet) return pet;
 
-  const normalizedGovernorate = String(
-    pet?.location?.governorate || pet?.location?.city || ""
+  pet.country = String(pet?.country || pet?.location?.country || "").trim();
+  pet.governorate = String(
+    pet?.governorate ||
+      pet?.location?.governorate ||
+      pet?.location?.city ||
+      ""
   ).trim();
-
-  if (!pet.location || typeof pet.location !== "object") {
-    pet.location = {};
-  }
-
-  pet.location.governorate = normalizedGovernorate;
-  pet.location.city = normalizedGovernorate;
 
   if (pet?.owner && typeof pet.owner === "object") {
     const ownerGovernorate = String(
@@ -78,14 +75,37 @@ const parseLocationInput = (location) => {
   throw parseError;
 };
 
+const parsePetLocationInput = ({
+  country,
+  governorate,
+  location,
+} = {}) => {
+  const legacyLocation = parseLocationInput(location);
+
+  return normalizeLocation({
+    country:
+      country !== undefined ? String(country) : legacyLocation.country,
+    governorate:
+      governorate !== undefined
+        ? String(governorate)
+        : legacyLocation.governorate,
+  });
+};
+
 const buildPetLocationFilter = ({ country, governorate }) => {
-  const filter = {};
+  const conditions = [];
 
   if (country?.trim()) {
-    filter["location.country"] = {
+    const countryRegex = {
       $regex: `^${escapeRegex(country.trim())}$`,
       $options: "i",
     };
+    conditions.push({
+      $or: [
+        { country: countryRegex },
+        { "location.country": countryRegex },
+      ],
+    });
   }
 
   if (governorate?.trim()) {
@@ -93,13 +113,16 @@ const buildPetLocationFilter = ({ country, governorate }) => {
       $regex: escapeRegex(governorate.trim()),
       $options: "i",
     };
-    filter.$or = [
-      { "location.governorate": governorateRegex },
-      { "location.city": governorateRegex },
-    ];
+    conditions.push({
+      $or: [
+        { governorate: governorateRegex },
+        { "location.governorate": governorateRegex },
+        { "location.city": governorateRegex },
+      ],
+    });
   }
 
-  return filter;
+  return conditions.length ? { $and: conditions } : {};
 };
 
 const normalizeImageValue = (image) => {
@@ -442,8 +465,17 @@ const getPetsByOwner = async (req, res, next) => {
 
 const createPet = async (req, res, next) => {
   try {
-    const { name, type, breed, date, description, location, careRecord } =
-      req.body;
+    const {
+      name,
+      type,
+      breed,
+      date,
+      description,
+      country,
+      governorate,
+      location,
+      careRecord,
+    } = req.body;
     const owner = req.user.userId;
 
     if (!name || !type) {
@@ -452,7 +484,11 @@ const createPet = async (req, res, next) => {
         .json({ message: "name and type are required" });
     }
 
-    const normalizedLocation = parseLocationInput(location);
+    const normalizedLocation = parsePetLocationInput({
+      country,
+      governorate,
+      location,
+    });
 
     if (!normalizedLocation.governorate || !normalizedLocation.country) {
       return res
@@ -480,7 +516,8 @@ const createPet = async (req, res, next) => {
       image: images[0] || null,
       images,
       description,
-      location: normalizedLocation,
+      country: normalizedLocation.country,
+      governorate: normalizedLocation.governorate,
     };
 
     const parsedCareRecord = normalizeCareRecordInput(careRecord);
@@ -518,8 +555,21 @@ const updatePet = async (req, res, next) => {
 
     const updates = { ...req.body };
     delete updates.owner;
-    if (updates.location !== undefined) {
-      const normalizedLocation = parseLocationInput(updates.location);
+    const hasLocationUpdate =
+      updates.location !== undefined ||
+      updates.country !== undefined ||
+      updates.governorate !== undefined;
+
+    if (hasLocationUpdate) {
+      const normalizedLocation = parsePetLocationInput({
+        location: updates.location,
+        country:
+          updates.country !== undefined ? updates.country : pet.country,
+        governorate:
+          updates.governorate !== undefined
+            ? updates.governorate
+            : pet.governorate,
+      });
 
       if (!normalizedLocation.governorate || !normalizedLocation.country) {
         return res
@@ -527,8 +577,11 @@ const updatePet = async (req, res, next) => {
           .json({ message: "governorate and country are required for pet location" });
       }
 
-      updates.location = normalizedLocation;
+      updates.country = normalizedLocation.country;
+      updates.governorate = normalizedLocation.governorate;
     }
+    delete updates.location;
+    delete updates.city;
 
     if (updates.careRecord !== undefined) {
       const parsedCareRecord = normalizeCareRecordInput(updates.careRecord);

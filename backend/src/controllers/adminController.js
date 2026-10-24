@@ -73,6 +73,7 @@ const getPosts = async (req, res, next) => {
       filter.$or = [
         { title: expression },
         { description: expression },
+        { petType: expression },
         { pet_type: expression },
       ];
     }
@@ -348,6 +349,7 @@ const getDashboard = async (req, res, next) => {
       pendingReports,
       posts,
       publishedPosts,
+      resolvedPosts,
       blockedPosts,
       recentAppointments,
       recentReports,
@@ -362,6 +364,7 @@ const getDashboard = async (req, res, next) => {
       PostReport.countDocuments({ status: "pending" }),
       Post.countDocuments(),
       Post.countDocuments({ status: "published" }),
+      Post.countDocuments({ status: "resolved" }),
       Post.countDocuments({ status: "blocked" }),
       appointmentPopulate(
         Appointment.find().sort({ updatedAt: -1 }).limit(5)
@@ -385,6 +388,7 @@ const getDashboard = async (req, res, next) => {
         pendingReports,
         posts,
         publishedPosts,
+        resolvedPosts,
         blockedPosts,
       },
       recentAppointments,

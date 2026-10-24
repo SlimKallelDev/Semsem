@@ -45,17 +45,12 @@ function formatAge(dateValue) {
 }
 
 function formatLocation(pet) {
-  if (typeof pet?.location === "string") {
-    return pet.location.trim();
-  }
-
   const governorate =
-    pet?.location?.governorate ||
-    pet?.location?.city ||
+    pet?.governorate ||
     pet?.owner?.governorate ||
     pet?.owner?.city ||
     "";
-  const country = pet?.location?.country || pet?.owner?.country || "";
+  const country = pet?.country || pet?.owner?.country || "";
 
   return [country, governorate].filter(Boolean).join(", ");
 }

@@ -70,7 +70,7 @@ const buildPostFormData = (payload = {}) => {
   appendField(formData, "type", payload.type);
   appendField(formData, "title", payload.title);
   appendField(formData, "description", payload.description);
-  appendField(formData, "pet_type", payload.pet_type);
+  appendField(formData, "petType", payload.petType);
   appendField(formData, "price", payload.price);
   appendField(formData, "currency", payload.currency);
 
@@ -187,6 +187,21 @@ export const deletePost = async (postId) => {
   }
 };
 
+export const updatePostStatus = async (postId, status) => {
+  try {
+    const response = await API.patch(`/posts/${postId}/status`, { status });
+    return response.data;
+  } catch (error) {
+    console.error(
+      "updatePostStatus error:",
+      error?.response?.data || error.message
+    );
+    throw new Error(
+      error?.response?.data?.message || "Failed to update post status"
+    );
+  }
+};
+
 export const getMyPosts = async () => {
   try {
     const response = await API.get("/posts/me");
@@ -218,6 +233,7 @@ export default {
   getMyPosts,
   createPost,
   updatePost,
+  updatePostStatus,
   deletePost,
   reportPost,
 };

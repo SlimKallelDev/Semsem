@@ -68,7 +68,7 @@ const formatMemberSince = (dateValue) => {
 };
 
 const formatLocation = (item) => {
-  return [item?.location?.country, item?.location?.governorate || item?.location?.city]
+  return [item?.country, item?.governorate]
     .filter(Boolean)
     .join(", ");
 };
@@ -527,7 +527,7 @@ export default function PublicUserProfileScreen() {
                     </ThemedText>
 
                     <ThemedText style={styles.listItemSubtitle} numberOfLines={1}>
-                      {toTypeLabel(post?.pet_type || "Pet")}
+                      {toTypeLabel(post?.petType || "Pet")}
                     </ThemedText>
 
                     {!!postLocation && (

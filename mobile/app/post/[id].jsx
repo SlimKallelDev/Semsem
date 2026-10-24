@@ -37,6 +37,7 @@ import {
   deletePost,
   getPostById,
   reportPost,
+  updatePostStatus,
 } from "../../services/postService";
 import { useUser } from "../../contexts/UserContext";
 import { emitNotificationsUpdated } from "../../services/notificationEvents";
@@ -182,6 +183,7 @@ export default function PostDetailsScreen() {
   const [reportDetails, setReportDetails] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const postImages = useMemo(
     () => normalizeImageList(post?.images, post?.image),
@@ -454,6 +456,35 @@ export default function PostDetailsScreen() {
     ]);
   };
 
+  const handleResolvePost = () => {
+    Alert.alert(
+      "Mark as resolved",
+      "This post will be removed from the home feed. You can publish it again from My Posts.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Mark resolved",
+          onPress: async () => {
+            try {
+              setStatusUpdating(true);
+              await updatePostStatus(id, "resolved");
+              Alert.alert("Resolved", "The post was removed from the home feed.");
+              router.replace("/myposts");
+            } catch (error) {
+              console.log("Resolve post error:", error.message);
+              Alert.alert(
+                "Error",
+                error.message || "Failed to resolve the post"
+              );
+            } finally {
+              setStatusUpdating(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const locationText = [
     post?.location?.country,
     post?.location?.governorate || post?.location?.city,
@@ -639,7 +670,7 @@ export default function PostDetailsScreen() {
             </ThemedText>
 
             <ThemedText style={styles.meta}>
-              {getPostTypeLabel(post.type)} | {(post.pet_type || "Pet").toString()}
+              {getPostTypeLabel(post.type)} | {(post.petType || "Pet").toString()}
             </ThemedText>
 
             {!!locationText && (
@@ -744,6 +775,29 @@ export default function PostDetailsScreen() {
 
               {isOwner ? (
                 <View style={styles.ownerActionsRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.ownerActionButton,
+                      styles.ownerResolveButton,
+                      statusUpdating && styles.disabledButton,
+                    ]}
+                    onPress={handleResolvePost}
+                    disabled={statusUpdating || deleting}
+                    activeOpacity={0.8}
+                  >
+                    {statusUpdating ? (
+                      <ActivityIndicator size="small" color="#248241" />
+                    ) : (
+                      <Ionicons
+                        name="checkmark-circle-outline"
+                        size={19}
+                        color="#248241"
+                      />
+                    )}
+                    <ThemedText style={styles.ownerResolveText}>
+                      {statusUpdating ? "Updating..." : "Resolve"}
+                    </ThemedText>
+                  </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.ownerActionButton}
                     onPress={() => router.push(`/post/edit/${id}`)}
@@ -1443,6 +1497,10 @@ const styles = StyleSheet.create({
     borderColor: "#E6CFCF",
     backgroundColor: "#FFF9F9",
   },
+  ownerResolveButton: {
+    borderColor: "#BFE2C9",
+    backgroundColor: "#F3FBF5",
+  },
   ownerActionText: {
     fontSize: 13.5,
     fontWeight: "800",
@@ -1452,6 +1510,11 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     fontWeight: "800",
     color: "#B53A3A",
+  },
+  ownerResolveText: {
+    fontSize: 13.5,
+    fontWeight: "800",
+    color: "#248241",
   },
   disabledButton: {
     opacity: 0.7,

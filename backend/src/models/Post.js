@@ -47,7 +47,7 @@ const postSchema = new mongoose.Schema(
       },
     },
 
-    pet_type: {
+    petType: {
       type: String,
       default: "",
       trim: true,
@@ -94,18 +94,33 @@ const postSchema = new mongoose.Schema(
       index: true,
     },
 
-    likes_count: {
+    likesCount: {
       type: Number,
       default: 0,
     },
 
-    comments_count: {
+    commentsCount: {
       type: Number,
       default: 0,
     },
   },
-  { timestamps: true }
+  { timestamps: true, collection: "posts" }
 );
+
+postSchema.pre("init", function normalizeLegacyPostFields(data) {
+  if (data.petType === undefined && data.pet_type !== undefined) {
+    data.petType = data.pet_type;
+  }
+  if (data.likesCount === undefined && data.likes_count !== undefined) {
+    data.likesCount = data.likes_count;
+  }
+  if (data.commentsCount === undefined && data.comments_count !== undefined) {
+    data.commentsCount = data.comments_count;
+  }
+  delete data.pet_type;
+  delete data.likes_count;
+  delete data.comments_count;
+});
 
 postSchema.index({ createdAt: -1 });
 postSchema.index({ "location.country": 1, "location.governorate": 1 });
