@@ -13,7 +13,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Link, router } from "expo-router";
+import { Link, router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import Spacer from "../../components/Spacer";
@@ -26,6 +26,7 @@ import {
   shadows,
 } from "../../constants/designSystem";
 import { useUser } from "../../contexts/UserContext";
+import { consumeReturnPath, normalizeReturnPath } from "../../services/authReturnPath";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -33,6 +34,7 @@ export default function Login() {
   const [error, setError] = useState(null);
 
   const { login, loading } = useUser();
+  const params = useLocalSearchParams();
 
   const handleBackToHome = () => {
     router.replace("/home");
@@ -60,7 +62,8 @@ export default function Login() {
 
     try {
       await login(email.trim(), password);
-      router.replace("/home");
+      const rememberedPath = consumeReturnPath();
+      router.replace(normalizeReturnPath(params.returnTo) || rememberedPath);
     } catch (err) {
       setError(err.message || "Login failed. Please try again.");
     }

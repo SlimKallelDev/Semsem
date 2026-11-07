@@ -1,6 +1,6 @@
 // mobile/app/_layout.jsx
-import { Stack } from "expo-router";
-import { useEffect } from "react";
+import { Stack, usePathname } from "expo-router";
+import { useEffect, useLayoutEffect } from "react";
 import { Image, Platform, StatusBar, StyleSheet, View } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -13,6 +13,7 @@ import { checkBackendHealth, notifyNetworkRestored } from "../services/api";
 import AppVersionChecker from "../components/AppVersionChecker";
 import ConnectionBanner from "../components/ConnectionBanner";
 import * as Network from "expo-network";
+import { rememberReturnPath } from "../services/authReturnPath";
 
 if (Platform.OS !== "web") {
   SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -20,6 +21,11 @@ if (Platform.OS !== "web") {
 
 function AppBootstrap() {
   const { initializing } = useUser();
+  const pathname = usePathname();
+
+  useLayoutEffect(() => {
+    rememberReturnPath(pathname);
+  }, [pathname]);
 
   useEffect(() => {
     if (!initializing && Platform.OS !== "web") {
