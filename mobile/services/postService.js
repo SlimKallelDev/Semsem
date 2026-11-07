@@ -1,4 +1,5 @@
-import { createApiClient } from "./api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { createApiClient, dedupeGet } from "./api";
 
 const API = createApiClient();
 
@@ -106,17 +107,35 @@ const buildPostFormData = (payload = {}) => {
 };
 
 export const getPosts = async (filters = {}) => {
+  const params = {};
+  if (filters.country) params.country = filters.country;
+  if (filters.governorate) params.governorate = filters.governorate;
+  const cacheKey = `semsem:posts:${JSON.stringify(params)}`;
   try {
-    const params = {};
-
-    if (filters.country) params.country = filters.country;
-    if (filters.governorate) params.governorate = filters.governorate;
-
-    const response = await API.get("/posts", { params });
+    const response = await dedupeGet(cacheKey, () => API.get("/posts", { params }));
+    if (Array.isArray(response.data)) {
+      AsyncStorage.setItem(cacheKey, JSON.stringify(response.data)).catch(() => {});
+    }
     return response.data;
   } catch (error) {
     console.error("getPosts error:", error?.response?.data || error.message);
+    try {
+      const cached = await AsyncStorage.getItem(cacheKey);
+      if (cached) return JSON.parse(cached);
+    } catch {}
     throw new Error(error?.response?.data?.message || "Failed to load posts");
+  }
+};
+
+export const getCachedPosts = async (filters = {}) => {
+  const params = {};
+  if (filters.country) params.country = filters.country;
+  if (filters.governorate) params.governorate = filters.governorate;
+  try {
+    const cached = await AsyncStorage.getItem(`semsem:posts:${JSON.stringify(params)}`);
+    return cached ? JSON.parse(cached) : null;
+  } catch {
+    return null;
   }
 };
 

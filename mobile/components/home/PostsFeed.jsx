@@ -6,14 +6,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect, router } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useLocationFilter } from "../../contexts/LocationFilterContext";
 import { normalizePostType } from "../../constants/postTypes";
-import { getPosts } from "../../services/postService";
+import { getCachedPosts, getPosts } from "../../services/postService";
+import { getBackendStatus, subscribeBackendStatus, subscribeNetworkRestored } from "../../services/api";
 import ThemedText from "../ThemedText";
 import PostCard from "./PostCard";
 
@@ -28,29 +29,55 @@ export default function PostsFeed({ selectedFilter = "All" }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [feedError, setFeedError] = useState(false);
+  const [backendStatus, setBackendStatus] = useState(getBackendStatus());
+  const hasLoadedOnce = useRef(false);
+  const hasPosts = useRef(false);
+  const currentFilterKey = useRef(null);
 
-  const loadPosts = async (isRefreshing = false) => {
+  useEffect(() => subscribeBackendStatus(setBackendStatus), []);
+
+  const loadPosts = useCallback(async (isRefreshing = false) => {
+    const filterKey = JSON.stringify({ country: filters.country || "", governorate: filters.governorate || "" });
+    if (currentFilterKey.current !== filterKey) {
+      currentFilterKey.current = filterKey;
+      hasLoadedOnce.current = false;
+      hasPosts.current = false;
+    }
+    if (!isRefreshing && !hasLoadedOnce.current) {
+      const cached = await getCachedPosts(filters);
+      if (Array.isArray(cached)) {
+        setPosts(cached);
+        hasPosts.current = cached.length > 0;
+      }
+      hasLoadedOnce.current = true;
+    }
     try {
       if (isRefreshing) {
         setRefreshing(true);
-      } else {
+      } else if (!hasPosts.current) {
         setLoading(true);
       }
 
       const data = await getPosts(filters);
       setPosts(Array.isArray(data) ? data : []);
+      hasPosts.current = Array.isArray(data) && data.length > 0;
+      setFeedError(false);
     } catch (error) {
       console.log("Get posts error:", error.message);
+      setFeedError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [filters]);
+
+  useEffect(() => subscribeNetworkRestored(() => loadPosts(true)), [loadPosts]);
 
   useFocusEffect(
     useCallback(() => {
       loadPosts();
-    }, [filters.governorate, filters.country])
+    }, [loadPosts, filters.governorate, filters.country])
   );
 
   const filteredPosts =
@@ -81,15 +108,16 @@ export default function PostsFeed({ selectedFilter = "All" }) {
             <View style={styles.loadingCard}>
               <View style={styles.center}>
                 <ActivityIndicator size="large" color={GREEN} />
+                {backendStatus === "checking" ? <ThemedText style={styles.connectingText}>Connecting to Semsem...</ThemedText> : null}
               </View>
             </View>
           ) : !loading && filteredPosts.length === 0 ? (
             <View style={styles.emptyCard}>
               <View style={styles.emptyState}>
                 <MaterialCommunityIcons name="paw-off" size={42} color="#B9D8C1" />
-                <ThemedText style={styles.emptyTitle}>No posts yet</ThemedText>
+                <ThemedText style={styles.emptyTitle}>{feedError ? "Posts are temporarily unavailable" : "No posts yet"}</ThemedText>
                 <ThemedText style={styles.emptyText}>
-                  Try another category or change the area filter above.
+                  {feedError ? "Pull down to try again." : "Try another category or change the area filter above."}
                 </ThemedText>
               </View>
             </View>
@@ -139,6 +167,12 @@ const styles = StyleSheet.create({
     paddingVertical: 28,
     alignItems: "center",
     justifyContent: "center",
+  },
+  connectingText: {
+    marginTop: 10,
+    color: "#748079",
+    fontSize: 13,
+    fontWeight: "600",
   },
   emptyState: {
     alignItems: "center",

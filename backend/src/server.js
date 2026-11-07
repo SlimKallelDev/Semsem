@@ -8,6 +8,7 @@ const {
 const {
   applyModerationStatusesToExistingData,
 } = require("./services/moderationStatusService");
+const { ensureDefaultPolicy } = require("./services/appVersionService");
 
 // FIX DNS Windows
 dns.setServers(["1.1.1.1", "1.0.0.1", "8.8.8.8", "8.8.4.4"]);
@@ -17,19 +18,21 @@ const connectDB = require("./config/db");
 
 const startServer = async () => {
   try {
-    await connectDB();
-    await applyDefaultProfileTypeToExistingUsers();
-    await applyModerationStatusesToExistingData();
-
     const PORT = env.PORT || 5000;
     const server = http.createServer(app);
     const io = initSocket(server);
-
     app.set("io", io);
 
+    // Bind the HTTP port before Atlas connects so Render's health probe can
+    // reach the process while MongoDB is reconnecting after a cold start.
     server.listen(PORT, "0.0.0.0", () => {
       console.log(`Server listening on 0.0.0.0:${PORT}`);
     });
+
+    await connectDB();
+    await applyDefaultProfileTypeToExistingUsers();
+    await applyModerationStatusesToExistingData();
+    await ensureDefaultPolicy();
   } catch (err) {
     console.error("Failed to start server:", err.message);
     process.exit(1);

@@ -124,6 +124,8 @@ postSchema.pre("init", function normalizeLegacyPostFields(data) {
 
 postSchema.index({ createdAt: -1 });
 postSchema.index({ "location.country": 1, "location.governorate": 1 });
+postSchema.index({ status: 1, createdAt: -1 });
+postSchema.index({ status: 1, "location.country": 1, createdAt: -1 });
 
 module.exports = mongoose.model("Post", postSchema);
 

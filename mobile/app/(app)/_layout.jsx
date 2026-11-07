@@ -1,13 +1,16 @@
 import { Tabs, router, usePathname } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AppState } from "react-native";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { LocationFilterProvider } from "../../contexts/LocationFilterContext";
 import { useUser } from "../../contexts/UserContext";
+import { subscribeNetworkRestored } from "../../services/api";
 import { subscribeNotificationsUpdated } from "../../services/notificationEvents";
 import {
+  getCachedUnreadNotificationCount,
   getUnreadNotificationCount,
 } from "../../services/notificationService";
 import {
@@ -54,6 +57,8 @@ export default function AppLayout() {
   const insets = useSafeAreaInsets();
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const unreadRequest = useRef(null);
+  const lastUnreadLoadAt = useRef(0);
 
   const isLoggedIn = !!user;
   const isHomeActive =
@@ -64,24 +69,33 @@ export default function AppLayout() {
     [user]
   );
 
-  const loadUnreadCounts = useCallback(async () => {
+  const loadUnreadCounts = useCallback(async (force = false) => {
     if (!isLoggedIn) {
       setUnreadNotificationCount(0);
       setUnreadMessageCount(0);
       return;
     }
 
-    try {
-      const [notificationCount, messageCount] = await Promise.all([
+    if (unreadRequest.current) return unreadRequest.current;
+    if (!force && Date.now() - lastUnreadLoadAt.current < 30000) return;
+    const task = (async () => {
+      try {
+        const [notificationCount, messageCount] = await Promise.all([
         getUnreadNotificationCount({ excludeType: "message" }),
         getUnreadNotificationCount({ type: "message" }),
-      ]);
+        ]);
 
-      setUnreadNotificationCount(notificationCount);
-      setUnreadMessageCount(messageCount);
-    } catch (error) {
-      console.log("Load unread notifications error:", error.message);
-    }
+        setUnreadNotificationCount(notificationCount);
+        setUnreadMessageCount(messageCount);
+        lastUnreadLoadAt.current = Date.now();
+      } catch (error) {
+        console.log("Load unread notifications error:", error.message);
+      } finally {
+        unreadRequest.current = null;
+      }
+    })();
+    unreadRequest.current = task;
+    return task;
   }, [isLoggedIn]);
 
   useEffect(() => {
@@ -91,12 +105,31 @@ export default function AppLayout() {
       return;
     }
 
+    let active = true;
+    Promise.all([
+      getCachedUnreadNotificationCount({ excludeType: "message" }),
+      getCachedUnreadNotificationCount({ type: "message" }),
+    ]).then(([notificationCount, messageCount]) => {
+      if (active) {
+        if (notificationCount !== null) setUnreadNotificationCount(notificationCount);
+        if (messageCount !== null) setUnreadMessageCount(messageCount);
+      }
+    });
     loadUnreadCounts();
-  }, [isLoggedIn, loadUnreadCounts, pathname]);
+    return () => { active = false; };
+  }, [isLoggedIn, loadUnreadCounts]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") loadUnreadCounts();
+    });
+    const unsubscribeNetwork = subscribeNetworkRestored(() => loadUnreadCounts(true));
+    return () => { subscription.remove(); unsubscribeNetwork(); };
+  }, [loadUnreadCounts]);
 
   useEffect(() => {
     const unsubscribe = subscribeNotificationsUpdated(() => {
-      loadUnreadCounts();
+      loadUnreadCounts(true);
     });
 
     return unsubscribe;
