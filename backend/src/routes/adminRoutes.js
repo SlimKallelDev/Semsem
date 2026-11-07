@@ -20,8 +20,12 @@ const adminMiddleware = require("../middlewares/adminMiddleware");
 const authMiddleware = require("../middlewares/authMiddleware");
 
 const router = express.Router();
+const { getAppVersionPolicies, updateAppVersionPolicy } = require("../controllers/appVersionController");
 
 router.use(authMiddleware, adminMiddleware);
+
+router.get("/app-version", getAppVersionPolicies);
+router.patch("/app-version/:platform", updateAppVersionPolicy);
 
 router.get("/dashboard", getDashboard);
 router.get("/analytics/usage", getUsageAnalytics);

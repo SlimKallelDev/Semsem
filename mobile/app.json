@@ -4,14 +4,24 @@
     "name": "Semsem",
     "slug": "Semsem",
     "version": "1.0.0",
+    "runtimeVersion": { "policy": "appVersion" },
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "portrait",
     "icon": "./assets/startup-splash.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "com.semsem.pets",
+      "buildNumber": "1",
       "supportsTablet": true
     },
     "android": {
+      "package": "com.semsem.pets",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/startup-splash.png",
         "backgroundColor": "#59BE56"
@@ -27,6 +37,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-updates",
       "@react-native-community/datetimepicker",
       [
         "expo-location",

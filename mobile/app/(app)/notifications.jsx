@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -15,6 +15,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import ThemedText from "../../components/ThemedText";
 import { useUser } from "../../contexts/UserContext";
 import { emitNotificationsUpdated } from "../../services/notificationEvents";
+import { subscribeNetworkRestored } from "../../services/api";
+import { getCachedNotifications } from "../../services/notificationService";
 import {
   getNotifications,
   markAllNotificationsAsRead,
@@ -84,6 +86,8 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const hasNotifications = useRef(false);
+  const hasLoadedNotifications = useRef(false);
 
   const unreadCount = useMemo(
     () => notifications.filter((item) => !item?.isRead).length,
@@ -101,12 +105,14 @@ export default function NotificationsScreen() {
     try {
       if (isRefresh) {
         setRefreshing(true);
-      } else {
+      } else if (!hasNotifications.current) {
         setLoading(true);
       }
       setError(null);
       const data = await getNotifications({ excludeType: "message" });
       setNotifications(Array.isArray(data) ? data : []);
+      hasNotifications.current = Array.isArray(data) && data.length > 0;
+      hasLoadedNotifications.current = true;
     } catch (loadError) {
       console.log("Notifications page error:", loadError?.message || loadError);
       setError("Unable to load notifications.");
@@ -121,6 +127,23 @@ export default function NotificationsScreen() {
       loadNotifications();
     }, [loadNotifications])
   );
+
+  useEffect(() => {
+    let active = true;
+    if (user) {
+      getCachedNotifications({ excludeType: "message" }).then((cached) => {
+        if (active && !hasLoadedNotifications.current && Array.isArray(cached) && cached.length) {
+          setNotifications(cached);
+          hasNotifications.current = true;
+          hasLoadedNotifications.current = true;
+          setLoading(false);
+        }
+      });
+    }
+    return () => { active = false; };
+  }, [user]);
+
+  useEffect(() => subscribeNetworkRestored(() => loadNotifications(true)), [loadNotifications]);
 
   useEffect(() => {
     if (!initializing && !user) {

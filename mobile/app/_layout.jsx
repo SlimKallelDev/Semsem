@@ -8,6 +8,11 @@ import { UserProvider } from "../contexts/UserContext";
 import { useUser } from "../contexts/UserContext";
 import { preloadLocationSearchOptions } from "../constants/locationOptions";
 import { palette } from "../constants/designSystem";
+import { AppState } from "react-native";
+import { checkBackendHealth, notifyNetworkRestored } from "../services/api";
+import AppVersionChecker from "../components/AppVersionChecker";
+import ConnectionBanner from "../components/ConnectionBanner";
+import * as Network from "expo-network";
 
 if (Platform.OS !== "web") {
   SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -34,6 +39,20 @@ function AppBootstrap() {
     return () => clearTimeout(preloadTimer);
   }, []);
 
+  useEffect(() => {
+    checkBackendHealth().catch(() => {});
+    const appState = AppState.addEventListener("change", (state) => {
+      if (state === "active") checkBackendHealth().catch(() => {});
+    });
+    const network = Network.addNetworkStateListener((state) => {
+      if (state.isConnected) {
+        notifyNetworkRestored();
+        checkBackendHealth().catch(() => {});
+      }
+    });
+    return () => { appState.remove(); network.remove(); };
+  }, []);
+
   if (initializing) {
     return (
       <View style={styles.splashContainer}>
@@ -47,8 +66,9 @@ function AppBootstrap() {
   }
 
   return (
-    <>
+    <View style={styles.appRoot}>
       <StatusBar barStyle="dark-content" backgroundColor={palette.surface} />
+      <ConnectionBanner />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -56,7 +76,8 @@ function AppBootstrap() {
           contentStyle: { backgroundColor: palette.background },
         }}
       />
-    </>
+      <AppVersionChecker />
+    </View>
   );
 }
 
@@ -71,6 +92,7 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
+  appRoot: { flex: 1 },
   splashContainer: {
     flex: 1,
     backgroundColor: palette.surface,

@@ -312,13 +312,9 @@ const getAuthorProfileType = async (userId) => {
   return author.profileType;
 };
 
-const getActiveUserIds = () =>
-  User.find({ status: USER_STATUS.ACTIVE }).distinct("_id");
-
-const buildVisiblePostFilter = async (query = {}) => ({
+const buildVisiblePostFilter = (query = {}) => ({
   ...buildPostLocationFilter(query),
   status: POST_STATUS.PUBLISHED,
-  user: { $in: await getActiveUserIds() },
 });
 
 const createPost = async (req, res, next) => {
@@ -402,14 +398,15 @@ const createPost = async (req, res, next) => {
 
 const getPosts = async (req, res, next) => {
   try {
-    const filter = await buildVisiblePostFilter(req.query);
+    const filter = buildVisiblePostFilter(req.query);
 
     const posts = await Post.find(filter)
-      .populate("user", USER_PUBLIC_FIELDS)
+      .populate({ path: "user", select: USER_PUBLIC_FIELDS, match: { status: USER_STATUS.ACTIVE } })
       .sort({ createdAt: -1 });
 
-    posts.forEach(hydratePostImages);
-    res.status(200).json(posts);
+    const visiblePosts = posts.filter((post) => post.user);
+    visiblePosts.forEach(hydratePostImages);
+    res.status(200).json(visiblePosts);
   } catch (error) {
     next(error);
   }
@@ -417,12 +414,10 @@ const getPosts = async (req, res, next) => {
 
 const getPostById = async (req, res, next) => {
   try {
-    const activeUserIds = await getActiveUserIds();
     const post = await Post.findOne({
       _id: req.params.id,
       status: POST_STATUS.PUBLISHED,
-      user: { $in: activeUserIds },
-    }).populate("user", USER_PUBLIC_FIELDS);
+    }).populate({ path: "user", select: USER_PUBLIC_FIELDS, match: { status: USER_STATUS.ACTIVE } });
 
     if (!post) {
       return res.status(404).json({ message: "Post not found" });

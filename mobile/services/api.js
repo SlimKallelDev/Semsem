@@ -3,216 +3,182 @@ import axios from "axios";
 import { emitAuthExpired } from "./authEvents";
 
 const DEFAULT_API_URL = "https://semsem-072a.onrender.com/api";
-const REQUEST_TIMEOUT_MS = 20000;
-const MAX_RETRIES = 1;
+const NORMAL_TIMEOUT_MS = 25000;
+const COLD_START_TIMEOUT_MS = 105000;
+const HEALTH_TIMEOUT_MS = 110000;
+const MAX_GET_RETRIES = 2;
 let authExpiredNotified = false;
+let backendStatus = "unknown";
+let healthPromise = null;
+const statusListeners = new Set();
+const networkRestoredListeners = new Set();
+const inFlightGets = new Map();
+
+const publishBackendStatus = (status) => {
+  backendStatus = status;
+  statusListeners.forEach((listener) => listener(status));
+};
+export const getBackendStatus = () => backendStatus;
+export const subscribeBackendStatus = (listener) => {
+  statusListeners.add(listener);
+  return () => statusListeners.delete(listener);
+};
+export const notifyNetworkRestored = () => networkRestoredListeners.forEach((listener) => listener());
+export const subscribeNetworkRestored = (listener) => {
+  networkRestoredListeners.add(listener);
+  return () => networkRestoredListeners.delete(listener);
+};
 
 const isAuthenticationError = (status, message) => {
   const normalizedMessage = String(message || "").toLowerCase();
-
-  return (
-    status === 401 ||
+  return status === 401 ||
     (status === 403 && normalizedMessage.includes("blocked by an administrator")) ||
     normalizedMessage.includes("jwt expired") ||
     normalizedMessage.includes("invalid token") ||
-    normalizedMessage.includes("unauthorized")
-  );
+    normalizedMessage.includes("unauthorized");
 };
 
 const clearExpiredSession = async (apiMessage = "") => {
   await AsyncStorage.multiRemove(["token", "user"]);
-
   if (!authExpiredNotified) {
     authExpiredNotified = true;
-    const isBlocked = String(apiMessage)
-      .toLowerCase()
-      .includes("blocked by an administrator");
-    emitAuthExpired(
-      isBlocked
-        ? "Your account has been blocked by an administrator."
-        : "Session expired. Please login again."
-    );
+    const isBlocked = String(apiMessage).toLowerCase().includes("blocked by an administrator");
+    emitAuthExpired(isBlocked ? "Your account has been blocked by an administrator." : "Session expired. Please login again.");
   }
 };
-
-export const resetAuthExpiredNotice = () => {
-  authExpiredNotified = false;
-};
+export const resetAuthExpiredNotice = () => { authExpiredNotified = false; };
 
 const normalizeBaseUrl = (url) => {
   const value = String(url || "").trim();
   if (!value) return null;
-
-  const withProtocol = /^https?:\/\//i.test(value)
-    ? value
-    : `http://${value}`;
+  const withProtocol = /^https?:\/\//i.test(value) ? value : `http://${value}`;
   const trimmed = withProtocol.replace(/\/+$/, "");
-
   return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
 };
-
-const buildApiBaseUrl = () => {
-  const envUrl = normalizeBaseUrl(process.env.EXPO_PUBLIC_API_URL);
-  return envUrl || DEFAULT_API_URL;
-};
-
-const API_BASE_URL = buildApiBaseUrl();
+const envUrl = normalizeBaseUrl(process.env.EXPO_PUBLIC_API_URL);
+const API_BASE_URL = envUrl || DEFAULT_API_URL;
 export const API_ORIGIN = API_BASE_URL.replace(/\/api$/, "");
 
-const fetchWithTimeout = async (url, config, timeoutMs) => {
-  const controller =
-    typeof AbortController !== "undefined" ? new AbortController() : null;
-  const timeoutId = controller
-    ? setTimeout(() => controller.abort(), timeoutMs)
-    : null;
-
-  try {
-    return await fetch(url, {
-      ...config,
-      ...(controller ? { signal: controller.signal } : {}),
-    });
-  } catch (error) {
-    if (error?.name === "AbortError") {
-      throw new Error("Network request timed out");
+export const createApiClient = () => {
+  const client = axios.create({ baseURL: API_BASE_URL, timeout: NORMAL_TIMEOUT_MS });
+  client.interceptors.request.use(async (config) => {
+    const token = config.__semsemSkipAuth ? null : await AsyncStorage.getItem("token");
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+    else if (config.headers) {
+      delete config.headers.Authorization;
+      delete config.headers.authorization;
     }
+    const isHealth = String(config.url || "").includes("/health");
+    config.timeout = isHealth ? HEALTH_TIMEOUT_MS :
+      (backendStatus !== "awake" && !config.__semsemRetryCount ? COLD_START_TIMEOUT_MS : NORMAL_TIMEOUT_MS);
+    return config;
+  });
 
-    throw error;
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
+  client.interceptors.response.use((response) => {
+    if (String(response.config?.url || "").includes("/health") || response.status < 500) {
+      publishBackendStatus("awake");
+    }
+    return response;
+  }, async (error) => {
+    const config = error?.config;
+    const status = error?.response?.status;
+    const apiMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message;
+    const authorization = config?.headers?.Authorization || config?.headers?.authorization;
+    if (authorization && isAuthenticationError(status, apiMessage)) await clearExpiredSession(apiMessage);
+
+    if (error?.code === "ERR_CANCELED" || axios.isCancel(error) || config?.signal?.aborted) return Promise.reject(error);
+    const retryableClientError = [408, 425, 429].includes(status);
+    if (status >= 400 && status < 500 && !retryableClientError) return Promise.reject(error);
+    const isGet = config && String(config.method || "get").toLowerCase() === "get";
+    const retryable = isGet && !config.__semsemNoRetry &&
+      (!error.response || status === 408 || status === 425 || status === 429 || status >= 500);
+    if (retryable && (config.__semsemRetryCount || 0) < MAX_GET_RETRIES) {
+      config.__semsemRetryCount = (config.__semsemRetryCount || 0) + 1;
+      config.timeout = NORMAL_TIMEOUT_MS;
+      const waitMs = Math.min(1000 * (2 ** (config.__semsemRetryCount - 1)), 4000);
+      await new Promise((resolve, reject) => {
+        const signal = config.signal;
+        const onAbort = () => {
+          clearTimeout(timer);
+          signal?.removeEventListener("abort", onAbort);
+          const canceled = new Error("Request canceled");
+          canceled.code = "ERR_CANCELED";
+          reject(canceled);
+        };
+        const timer = setTimeout(() => {
+          signal?.removeEventListener("abort", onAbort);
+          resolve();
+        }, waitMs);
+        if (signal?.aborted) onAbort();
+        else signal?.addEventListener("abort", onAbort, { once: true });
+      });
+      return client.request(config);
+    }
+    if (!error.response && !isGet) publishBackendStatus("unavailable");
+    if (!error.response && isGet) publishBackendStatus("unavailable");
+    return Promise.reject(error);
+  });
+  return client;
+};
+
+export const dedupeGet = (key, requestFn) => {
+  if (inFlightGets.has(key)) return inFlightGets.get(key);
+  const requestPromise = Promise.resolve().then(requestFn).finally(() => inFlightGets.delete(key));
+  inFlightGets.set(key, requestPromise);
+  return requestPromise;
+};
+
+export const checkBackendHealth = () => {
+  if (healthPromise) return healthPromise;
+  const client = createApiClient();
+  publishBackendStatus("checking");
+  healthPromise = (async () => {
+    try {
+      let lastError;
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        try {
+          const response = await client.get("/health", { __semsemNoRetry: true });
+          if (response.status === 503 && attempt < 3) {
+            await new Promise((resolve) => setTimeout(resolve, 1000 * (2 ** attempt)));
+            continue;
+          }
+          publishBackendStatus("awake");
+          return response.data;
+        } catch (error) {
+          lastError = error;
+          if (error?.response?.status === 503 && attempt < 3) {
+            await new Promise((resolve) => setTimeout(resolve, 1000 * (2 ** attempt)));
+            continue;
+          }
+          throw error;
+        }
+      }
+      throw lastError || new Error("Backend is not ready");
+    } catch (error) {
+      publishBackendStatus("unavailable");
+      throw error;
+    }
+  })().finally(() => { healthPromise = null; });
+  return healthPromise;
 };
 
 export const request = async (endpoint, options = {}) => {
-  let attempt = 0;
-  const { skipAuth = false, ...requestOptions } = options;
-
-  while (attempt <= MAX_RETRIES) {
-    try {
-      const token = skipAuth ? null : await AsyncStorage.getItem("token");
-      const isFormData =
-        typeof FormData !== "undefined" && requestOptions.body instanceof FormData;
-
-      const headers = {
-        ...(isFormData ? {} : { "Content-Type": "application/json" }),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(requestOptions.headers || {}),
-      };
-
-      const response = await fetchWithTimeout(
-        `${API_BASE_URL}${endpoint}`,
-        { ...requestOptions, headers },
-        REQUEST_TIMEOUT_MS
-      );
-
-      let data = null;
-
-      try {
-        data = await response.json();
-      } catch (err) {
-        data = null;
-      }
-
-      if (!response.ok) {
-        const apiMessage = data?.message || data?.error || "Request failed";
-        const isUnauthorized = isAuthenticationError(response.status, apiMessage);
-
-        if (isUnauthorized && token) {
-          await clearExpiredSession(apiMessage);
-        }
-
-        console.log("API ERROR:", {
-          endpoint,
-          status: response.status,
-          message: apiMessage,
-          baseURL: API_BASE_URL,
-        });
-
-        const error = new Error(apiMessage);
-        error.status = response.status;
-        error.isHttpError = true;
-        throw error;
-      }
-
-      return data;
-    } catch (error) {
-      const message = String(error?.message || "");
-      const canRetry =
-        attempt < MAX_RETRIES &&
-        (message.toLowerCase().includes("timed out") ||
-          message.toLowerCase().includes("network request failed"));
-
-      if (canRetry) {
-        attempt += 1;
-        continue;
-      }
-
-      if (!error?.isHttpError) {
-        console.log("NETWORK ERROR:", error.message, {
-          endpoint,
-          baseURL: API_BASE_URL,
-        });
-      }
-      throw error;
-    }
-  }
-};
-
-export const createApiClient = ({ timeout = REQUEST_TIMEOUT_MS } = {}) => {
-  const client = axios.create({
-    baseURL: API_BASE_URL,
-    timeout,
+  const { skipAuth = false, body, ...requestOptions } = options;
+  const client = createApiClient();
+  const headers = { ...(skipAuth ? { Authorization: undefined } : {}), ...(requestOptions.headers || {}) };
+  const method = String(requestOptions.method || "GET").toLowerCase();
+  const response = await client.request({
+    url: endpoint,
+    method,
+    data: body,
+    headers,
+    signal: requestOptions.signal,
+    params: requestOptions.params,
+    timeout: requestOptions.timeout,
+    __semsemNoRetry: requestOptions.__semsemNoRetry,
+    __semsemSkipAuth: skipAuth,
   });
-
-  client.interceptors.request.use(
-    async (config) => {
-      const token = await AsyncStorage.getItem("token");
-
-      if (token) {
-        config.headers = {
-          ...config.headers,
-          Authorization: `Bearer ${token}`,
-        };
-      } else if (config.headers) {
-        delete config.headers.Authorization;
-        delete config.headers.authorization;
-      }
-
-      return config;
-    },
-    (error) => Promise.reject(error)
-  );
-
-  client.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-      const status = error?.response?.status;
-      const apiMessage =
-        error?.response?.data?.message ||
-        error?.response?.data?.error ||
-        error?.message;
-      const authorization = error?.config?.headers?.Authorization;
-
-      if (authorization && isAuthenticationError(status, apiMessage)) {
-        await clearExpiredSession(apiMessage);
-      }
-
-      const config = error?.config;
-      const isRetryableGet =
-        config &&
-        String(config.method || "get").toLowerCase() === "get" &&
-        !error?.response &&
-        !config.__semsemRetried;
-
-      if (isRetryableGet) {
-        config.__semsemRetried = true;
-        return client.request(config);
-      }
-
-      return Promise.reject(error);
-    }
-  );
-
-  return client;
+  return response.data;
 };
 
 export default API_BASE_URL;

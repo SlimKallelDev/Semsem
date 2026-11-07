@@ -15,6 +15,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const appointmentRoutes = require("./routes/appointmentRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const locationRoutes = require("./routes/locationRoutes");
+const appVersionRoutes = require("./routes/appVersionRoutes");
 
 const { notFound, errorHandler } = require("./middlewares/errorMiddleware");
 
@@ -28,6 +29,15 @@ app.get("/", (req, res) => {
   res.json({ message: "Backend is alive! 🚀" });
 });
 
+app.get("/api/health", (req, res) => {
+  const mongoose = require("mongoose");
+  const databaseReady = mongoose.connection.readyState === 1;
+  res.status(databaseReady ? 200 : 503).json({
+    status: databaseReady ? "ok" : "starting",
+    database: databaseReady ? "connected" : "connecting",
+  });
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/pets", petRoutes);
@@ -39,6 +49,7 @@ app.use("/api/conversations", conversationRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/app-version", appVersionRoutes);
 app.use("/api/locations", locationRoutes);
 
 app.use(notFound);
