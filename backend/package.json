@@ -7,6 +7,7 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "create-admin": "node scripts/createAdmin.js",
+    "seed-feed-examples": "node scripts/seedFeedExamples.js",
     "audit-class-diagram": "node scripts/auditClassDiagram.js",
     "migrate-class-diagram": "node scripts/migrateClassDiagramFields.js"
   },

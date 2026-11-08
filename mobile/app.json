@@ -1,8 +1,8 @@
 {
   "expo": {
     "scheme": "semsemapp",
-    "name": "Semsem",
-    "slug": "Semsem",
+    "name": "Semsem Pets",
+    "slug": "semsem-pets",
     "version": "1.0.0",
     "runtimeVersion": { "policy": "appVersion" },
     "updates": {

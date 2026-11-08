@@ -428,8 +428,8 @@ export default function NewPostScreen() {
             keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
           >
-            <ThemedText type="title" style={styles.title}>
-              Create New Post
+            <ThemedText style={styles.introText}>
+              Share a question, announcement, or service with the Semsem community.
             </ThemedText>
 
             <ThemedText style={styles.label}>Title</ThemedText>
@@ -441,6 +441,9 @@ export default function NewPostScreen() {
             />
 
             <ThemedText style={styles.label}>Type</ThemedText>
+            <ThemedText style={styles.helperText}>
+              Choose the category that best matches your post.
+            </ThemedText>
             <View style={styles.typeSelectWrap}>
               <TouchableOpacity
                 style={styles.typeSelectButton}
@@ -674,7 +677,10 @@ export default function NewPostScreen() {
               Animal type: {derivedPetType || "Choose pets or Other"}
             </ThemedText>
 
-            <ThemedText style={styles.label}>Images (optional, up to 5)</ThemedText>
+            <ThemedText style={styles.label}>Photos (optional, up to 5)</ThemedText>
+            <ThemedText style={styles.helperText}>
+              A clear photo can help people understand your post. You can publish without one.
+            </ThemedText>
             <ThemedText style={styles.imageCountText}>
               {images.length}/{MAX_IMAGES} selected
             </ThemedText>
@@ -774,8 +780,10 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
-  title: {
-    marginBottom: 20,
+  introText: {
+    marginBottom: 8,
+    color: "#6F7C74",
+    lineHeight: 21,
   },
   sectionTitle: {
     marginTop: 20,

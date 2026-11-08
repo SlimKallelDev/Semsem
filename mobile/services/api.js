@@ -165,20 +165,36 @@ export const checkBackendHealth = () => {
 export const request = async (endpoint, options = {}) => {
   const { skipAuth = false, body, ...requestOptions } = options;
   const client = createApiClient();
-  const headers = { ...(skipAuth ? { Authorization: undefined } : {}), ...(requestOptions.headers || {}) };
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+  const headers = {
+    ...(body !== undefined && !isFormData ? { "Content-Type": "application/json" } : {}),
+    ...(skipAuth ? { Authorization: undefined } : {}),
+    ...(requestOptions.headers || {}),
+  };
   const method = String(requestOptions.method || "GET").toLowerCase();
-  const response = await client.request({
-    url: endpoint,
-    method,
-    data: body,
-    headers,
-    signal: requestOptions.signal,
-    params: requestOptions.params,
-    timeout: requestOptions.timeout,
-    __semsemNoRetry: requestOptions.__semsemNoRetry,
-    __semsemSkipAuth: skipAuth,
-  });
-  return response.data;
+  try {
+    const response = await client.request({
+      url: endpoint,
+      method,
+      data: body,
+      headers,
+      signal: requestOptions.signal,
+      params: requestOptions.params,
+      timeout: requestOptions.timeout,
+      __semsemNoRetry: requestOptions.__semsemNoRetry,
+      __semsemSkipAuth: skipAuth,
+    });
+    return response.data;
+  } catch (error) {
+    const apiMessage = error?.response?.data?.message || error?.response?.data?.error;
+    if (apiMessage) {
+      const normalizedError = new Error(apiMessage);
+      normalizedError.status = error.response.status;
+      normalizedError.response = error.response;
+      throw normalizedError;
+    }
+    throw error;
+  }
 };
 
 export default API_BASE_URL;
