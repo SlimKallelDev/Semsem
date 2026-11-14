@@ -5,6 +5,7 @@ const POST_REPORT_REASONS = [
   "misleading",
   "inappropriate",
   "harassment",
+  "child_safety",
   "other",
 ];
 
