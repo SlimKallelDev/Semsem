@@ -13,11 +13,7 @@ export const rememberReturnPath = (pathname) => {
   lastReturnPath = path;
 };
 
-export const consumeReturnPath = () => {
-  const path = lastReturnPath;
-  lastReturnPath = null;
-  return path || "/home";
-};
+export const getRememberedReturnPath = () => lastReturnPath || "/home";
 
 export const normalizeReturnPath = (candidate) => {
   const value = Array.isArray(candidate) ? candidate[0] : candidate;

@@ -1,10 +1,12 @@
 {
   "expo": {
     "scheme": "semsemapp",
-    "name": "Semsem",
-    "slug": "Semsem",
+    "name": "Semsem Pets",
+    "slug": "semsem-pets",
     "version": "1.0.0",
-    "runtimeVersion": { "policy": "appVersion" },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
@@ -16,12 +18,15 @@
     "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.semsem.pets",
-      "buildNumber": "1",
-      "supportsTablet": true
+      "buildNumber": "3",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.semsem.pets",
-      "versionCode": 1,
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/startup-splash.png",
         "backgroundColor": "#59BE56"
@@ -54,6 +59,16 @@
           "backgroundColor": "#ffffff"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "574e47a1-3ff2-4d19-9567-db8e747f744b"
+      }
+    }
   }
 }

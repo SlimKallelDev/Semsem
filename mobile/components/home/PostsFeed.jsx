@@ -117,8 +117,20 @@ export default function PostsFeed({ selectedFilter = "All" }) {
                 <MaterialCommunityIcons name="paw-off" size={42} color="#B9D8C1" />
                 <ThemedText style={styles.emptyTitle}>{feedError ? "Posts are temporarily unavailable" : "No posts yet"}</ThemedText>
                 <ThemedText style={styles.emptyText}>
-                  {feedError ? "Pull down to try again." : "Try another category or change the area filter above."}
+                  {feedError ? "Check your connection and try again." : "Try another category or change the area filter above."}
                 </ThemedText>
+                {feedError ? (
+                  <TouchableOpacity
+                    style={styles.retryButton}
+                    activeOpacity={0.84}
+                    onPress={() => loadPosts(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Try loading posts again"
+                  >
+                    <Ionicons name="refresh" size={16} color="#FFFFFF" />
+                    <ThemedText style={styles.retryButtonText}>Try again</ThemedText>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             </View>
           ) : null
@@ -192,6 +204,22 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#7A8680",
     lineHeight: 21,
+  },
+  retryButton: {
+    marginTop: 16,
+    minHeight: 42,
+    paddingHorizontal: 18,
+    borderRadius: 22,
+    backgroundColor: GREEN,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
   },
   fab: {
     position: "absolute",

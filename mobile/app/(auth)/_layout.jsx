@@ -5,9 +5,9 @@ import GuestOnly from "../../components/auth/GuestOnly";
 import ThemedLoader from "../../components/ThemedLoader";
 
 export default function AuthLayout() {
-  const { loading, initializing } = useUser();
+  const { initializing } = useUser();
 
-  if (loading || initializing) {
+  if (initializing) {
     return <ThemedLoader fullScreen />;
   }
 

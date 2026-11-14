@@ -26,15 +26,21 @@ import {
   shadows,
 } from "../../constants/designSystem";
 import { useUser } from "../../contexts/UserContext";
-import { consumeReturnPath, normalizeReturnPath } from "../../services/authReturnPath";
+import { getRememberedReturnPath, normalizeReturnPath } from "../../services/authReturnPath";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
+  const [submittingLogin, setSubmittingLogin] = useState(false);
 
-  const { login, loading } = useUser();
+  const { login, loading, user } = useUser();
   const params = useLocalSearchParams();
+  const destination = normalizeReturnPath(params.returnTo) || getRememberedReturnPath();
+
+  useEffect(() => {
+    if (user && !loading && !submittingLogin) router.replace("/home");
+  }, [user, loading, submittingLogin]);
 
   const handleBackToHome = () => {
     router.replace("/home");
@@ -59,13 +65,14 @@ export default function Login() {
     }
 
     setError(null);
+    setSubmittingLogin(true);
 
     try {
       await login(email.trim(), password);
-      const rememberedPath = consumeReturnPath();
-      router.replace(normalizeReturnPath(params.returnTo) || rememberedPath);
+      router.replace(destination);
     } catch (err) {
       setError(err.message || "Login failed. Please try again.");
+      setSubmittingLogin(false);
     }
   };
 

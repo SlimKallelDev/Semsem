@@ -1,3 +1,4 @@
+
 {
   "cli": {
     "version": ">= 16.0.0",
@@ -13,7 +14,19 @@
       "channel": "preview"
     },
     "production": {
-      "channel": "production"
+      "channel": "production",
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6832009955"
+      },
+      "android": {
+        "track": "internal"
+      }
     }
   }
 }
+
