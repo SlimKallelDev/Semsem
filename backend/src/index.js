@@ -2,6 +2,7 @@ require("./config/env");
 
 const express = require("express");
 const cors = require("cors");
+const path = require("node:path");
 
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -27,6 +28,10 @@ app.use(express.urlencoded({ extended: true }));
 
 app.get("/", (req, res) => {
   res.json({ message: "Backend is alive! 🚀" });
+});
+
+app.get("/account-deletion", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "account-deletion.html"));
 });
 
 app.get("/api/health", (req, res) => {

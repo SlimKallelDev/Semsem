@@ -7,6 +7,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -33,6 +34,7 @@ import {
 } from "../../constants/profileTypes";
 import { useUser } from "../../contexts/UserContext";
 import { getPetsByOwner } from "../../services/petService";
+import { API_ORIGIN } from "../../services/api";
 import { getPostsByUser } from "../../services/postService";
 import {
   getUser,
@@ -569,6 +571,15 @@ export default function ProfileScreen() {
                 </View>
 
               {/* ── Logout ── */}
+              <TouchableOpacity
+                style={styles.deleteAccountButton}
+                activeOpacity={0.85}
+                onPress={() => Linking.openURL(`${API_ORIGIN}/account-deletion`)}
+              >
+                <Ionicons name="trash-outline" size={19} color="#B63232" />
+                <ThemedText style={styles.deleteAccountText}>Delete Account</ThemedText>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={styles.logoutButton}
                 activeOpacity={0.85}
@@ -1184,6 +1195,23 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#F2DADA",
     backgroundColor: "#FFF7F7",
+  },
+  deleteAccountButton: {
+    minHeight: 50,
+    marginTop: 18,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: "#F0D5D5",
+    borderRadius: 14,
+    backgroundColor: "#FFF8F8",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  deleteAccountText: {
+    color: "#B63232",
+    fontWeight: "700",
   },
   logoutText: {
     fontSize: 16,
