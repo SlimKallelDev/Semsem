@@ -81,6 +81,7 @@ const REPORT_REASON_LABELS = {
   misleading: "False or misleading information",
   inappropriate: "Inappropriate content",
   harassment: "Harassment or abuse",
+  child_safety: "Child safety concern",
   other: "Other reason",
 };
 

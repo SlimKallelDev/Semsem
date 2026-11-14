@@ -572,6 +572,17 @@ export default function ProfileScreen() {
 
               {/* ── Logout ── */}
               <TouchableOpacity
+                style={styles.safetyStandardsButton}
+                activeOpacity={0.85}
+                onPress={() => Linking.openURL(`${API_ORIGIN}/child-safety-standards`)}
+              >
+                <Ionicons name="shield-checkmark-outline" size={19} color={GREEN_DARK} />
+                <ThemedText style={styles.safetyStandardsText}>
+                  Child Safety Standards
+                </ThemedText>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={styles.deleteAccountButton}
                 activeOpacity={0.85}
                 onPress={() => Linking.openURL(`${API_ORIGIN}/account-deletion`)}
@@ -1208,6 +1219,23 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexDirection: "row",
     gap: 8,
+  },
+  safetyStandardsButton: {
+    minHeight: 50,
+    marginTop: 18,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 14,
+    backgroundColor: "#F8FBF8",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  safetyStandardsText: {
+    color: GREEN_DARK,
+    fontWeight: "700",
   },
   deleteAccountText: {
     color: "#B63232",

@@ -34,6 +34,10 @@ app.get("/account-deletion", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "account-deletion.html"));
 });
 
+app.get("/child-safety-standards", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "child-safety-standards.html"));
+});
+
 app.get("/api/health", (req, res) => {
   const mongoose = require("mongoose");
   const databaseReady = mongoose.connection.readyState === 1;

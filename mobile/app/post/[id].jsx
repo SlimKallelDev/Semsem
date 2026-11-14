@@ -112,6 +112,12 @@ const REPORT_REASONS = [
     icon: "hand-left-outline",
   },
   {
+    value: "child_safety",
+    label: "Child safety concern",
+    description: "Sexual exploitation or abuse involving someone under 18",
+    icon: "shield-outline",
+  },
+  {
     value: "other",
     label: "Something else",
     description: "A different issue that needs review",
