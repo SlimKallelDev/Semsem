@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -231,6 +232,7 @@ export default function ActivityScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const hasLoadedActivity = useRef(false);
 
   const loadActivity = useCallback(async (isRefresh = false) => {
     if (!userId) {
@@ -243,7 +245,7 @@ export default function ActivityScreen() {
     try {
       if (isRefresh) {
         setRefreshing(true);
-      } else {
+      } else if (!hasLoadedActivity.current) {
         setLoading(true);
       }
 
@@ -284,6 +286,7 @@ export default function ActivityScreen() {
       );
 
       setActivity(nextActivity);
+      hasLoadedActivity.current = true;
     } catch (loadError) {
       console.log("Activity page error:", loadError?.message || loadError);
       setError("Unable to load activity.");
@@ -296,6 +299,17 @@ export default function ActivityScreen() {
   useFocusEffect(
     useCallback(() => {
       loadActivity();
+      const interval = setInterval(() => {
+        if (AppState.currentState === "active") loadActivity();
+      }, 60000);
+      const appState = AppState.addEventListener("change", (state) => {
+        if (state === "active") loadActivity();
+      });
+
+      return () => {
+        clearInterval(interval);
+        appState.remove();
+      };
     }, [loadActivity])
   );
 

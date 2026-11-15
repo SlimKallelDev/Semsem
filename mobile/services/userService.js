@@ -5,6 +5,10 @@ export const getUser = async (userId) => {
   return request(`/users/${userId}`);
 };
 
+export const deleteUserAccount = async (userId) => {
+  return request(`/users/${userId}`, { method: "DELETE" });
+};
+
 export const getUsers = async () => {
   return request("/users");
 };
@@ -109,6 +113,7 @@ export default {
   logout: authService.logout,
   getUsers,
   getUser,
+  deleteUserAccount,
   getUserReviews,
   submitUserReview,
   deleteMyUserReview,

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   FlatList,
   Image,
   RefreshControl,
@@ -10,7 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 
 import ThemedText from "../../components/ThemedText";
 import ThemedView from "../../components/ThemedView";
@@ -74,9 +75,22 @@ export default function MessagesScreen() {
     }
   }, [userId]);
 
-  useEffect(() => {
-    loadConversations();
-  }, [loadConversations]);
+  useFocusEffect(
+    useCallback(() => {
+      loadConversations();
+      const interval = setInterval(() => {
+        if (AppState.currentState === "active") loadConversations();
+      }, 30000);
+      const appState = AppState.addEventListener("change", (state) => {
+        if (state === "active") loadConversations();
+      });
+
+      return () => {
+        clearInterval(interval);
+        appState.remove();
+      };
+    }, [loadConversations])
+  );
 
   useEffect(() => {
     if (!initializing && !userId) {

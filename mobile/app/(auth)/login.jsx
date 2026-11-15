@@ -5,6 +5,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Text,
   TouchableWithoutFeedback,
   Keyboard,
   ActivityIndicator,

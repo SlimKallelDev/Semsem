@@ -48,6 +48,7 @@ import {
   isVeterinaryUser,
 } from "../../constants/userDisplay";
 import { getPostTypeLabel } from "../../constants/postTypes";
+import { usePreferences } from "../../contexts/PreferencesContext";
 
 const getEntityId = (value) => {
   if (!value) return null;
@@ -165,6 +166,7 @@ function PostActionButton({
 export default function PostDetailsScreen() {
   const { id } = useLocalSearchParams();
   const { user } = useUser();
+  const { t } = usePreferences();
   const insets = useSafeAreaInsets();
 
   const currentUserId = useMemo(
@@ -732,13 +734,19 @@ export default function PostDetailsScreen() {
                         style={styles.linkedPetButton}
                         activeOpacity={0.84}
                         accessibilityRole="link"
+                        accessibilityLabel={`${t("View profile")}: ${pet?.name || t("View pet")}`}
                         onPress={() => router.push(`/pet/${petId}`)}
                       >
                         <Ionicons name="paw" size={16} color="#2F8E4C" />
                         <ThemedText style={styles.linkedPetButtonText} numberOfLines={1}>
                           {pet?.name || "View pet"}
                         </ThemedText>
-                        <Ionicons name="chevron-forward" size={15} color="#6D8B77" />
+                        <View style={styles.linkedPetAction}>
+                          <ThemedText style={styles.linkedPetActionText}>
+                            {t("View profile")}
+                          </ThemedText>
+                          <Ionicons name="chevron-forward" size={14} color="#2F8E4C" />
+                        </View>
                       </TouchableOpacity>
                     );
                   })}
@@ -1439,7 +1447,9 @@ const styles = StyleSheet.create({
     borderColor: "#D2E7D7",
     backgroundColor: "#F3FAF5",
   },
-  linkedPetButtonText: { maxWidth: 180, color: "#34734A", fontSize: 13, fontWeight: "700" },
+  linkedPetButtonText: { maxWidth: 140, color: "#34734A", fontSize: 13, fontWeight: "800" },
+  linkedPetAction: { flexDirection: "row", alignItems: "center", gap: 2 },
+  linkedPetActionText: { color: "#2F8E4C", fontSize: 11, fontWeight: "900" },
   location: {
     fontSize: 14,
     opacity: 0.8,
