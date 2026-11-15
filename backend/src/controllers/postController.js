@@ -1,5 +1,7 @@
 const Post = require("../models/Post");
 const User = require("../models/User");
+const Pet = require("../models/Pet");
+const mongoose = require("mongoose");
 const { uploadPostImageBuffer } = require("../services/cloudinaryService");
 const {
   POST_TYPES,
@@ -300,6 +302,33 @@ const hydratePostImages = (post) => {
 const getPetTypeInput = (body = {}) =>
   body.petType !== undefined ? body.petType : body.pet_type;
 
+const getLinkedPetIdsInput = (body = {}) =>
+  body.petIds !== undefined ? body.petIds : body.linkedPets;
+
+const normalizePetIds = (value) => {
+  if (value === undefined || value === null || value === "") return [];
+  let ids = value;
+  if (typeof ids === "string") {
+    try {
+      ids = JSON.parse(ids);
+    } catch {
+      return null;
+    }
+  }
+  if (!Array.isArray(ids)) return null;
+
+  const uniqueIds = [...new Set(ids.map((id) => String(id || "").trim()).filter(Boolean))];
+  if (uniqueIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) return null;
+  return uniqueIds.map((id) => new mongoose.Types.ObjectId(id));
+};
+
+const findOwnedPetIds = async (petIds, ownerId) => {
+  if (!Array.isArray(petIds)) return null;
+  if (petIds.length === 0) return [];
+  const ownedPets = await Pet.find({ _id: { $in: petIds }, owner: ownerId }).select("_id");
+  return ownedPets.length === petIds.length ? petIds : null;
+};
+
 const getAuthorProfileType = async (userId) => {
   const author = await User.findById(userId).select("profileType");
 
@@ -321,8 +350,17 @@ const createPost = async (req, res, next) => {
   try {
     const { type, title, description, location, price, currency } = req.body;
     const petType = getPetTypeInput(req.body);
+    const petIds = normalizePetIds(getLinkedPetIdsInput(req.body));
     const normalizedType = normalizePostType(type);
     const userId = req.user?.userId;
+
+    if (!petIds) {
+      return res.status(400).json({ message: "Invalid linked pet selection" });
+    }
+    const linkedPets = await findOwnedPetIds(petIds, userId);
+    if (!linkedPets) {
+      return res.status(403).json({ message: "Posts can only link to your own pets" });
+    }
 
     const normalizedLocation = parseLocationInput(location);
     const { images } = await resolvePostImages({
@@ -376,6 +414,7 @@ const createPost = async (req, res, next) => {
       image: images[0] || "",
       images,
       petType: String(petType || "").trim(),
+      linkedPets,
       price: saleDetails.price,
       currency: saleDetails.currency,
       location: normalizedLocation,
@@ -384,10 +423,9 @@ const createPost = async (req, res, next) => {
 
     const post = await Post.create(postPayload);
 
-    const populatedPost = await Post.findById(post._id).populate(
-      "user",
-      USER_PUBLIC_FIELDS
-    );
+    const populatedPost = await Post.findById(post._id)
+      .populate("user", USER_PUBLIC_FIELDS)
+      .populate("linkedPets", "_id name type image");
     hydratePostImages(populatedPost);
 
     res.status(201).json(populatedPost);
@@ -402,6 +440,7 @@ const getPosts = async (req, res, next) => {
 
     const posts = await Post.find(filter)
       .populate({ path: "user", select: USER_PUBLIC_FIELDS, match: { status: USER_STATUS.ACTIVE } })
+      .populate("linkedPets", "_id name type image")
       .sort({ createdAt: -1 });
 
     const visiblePosts = posts.filter((post) => post.user);
@@ -414,10 +453,18 @@ const getPosts = async (req, res, next) => {
 
 const getPostById = async (req, res, next) => {
   try {
-    const post = await Post.findOne({
-      _id: req.params.id,
-      status: POST_STATUS.PUBLISHED,
-    }).populate({ path: "user", select: USER_PUBLIC_FIELDS, match: { status: USER_STATUS.ACTIVE } });
+    const visibilityFilter = req.user
+      ? {
+          _id: req.params.id,
+          $or: [
+            { status: POST_STATUS.PUBLISHED },
+            { status: POST_STATUS.DISABLED, user: req.user.userId },
+          ],
+        }
+      : { _id: req.params.id, status: POST_STATUS.PUBLISHED };
+    const post = await Post.findOne(visibilityFilter)
+      .populate({ path: "user", select: USER_PUBLIC_FIELDS, match: { status: USER_STATUS.ACTIVE } })
+      .populate("linkedPets", "_id name type image");
 
     if (!post) {
       return res.status(404).json({ message: "Post not found" });
@@ -446,6 +493,7 @@ const getPostsByUser = async (req, res, next) => {
       status: POST_STATUS.PUBLISHED,
     })
       .populate("user", USER_PUBLIC_FIELDS)
+      .populate("linkedPets", "_id name type image")
       .sort({ createdAt: -1 });
 
     posts.forEach(hydratePostImages);
@@ -459,6 +507,7 @@ const getMyPosts = async (req, res, next) => {
   try {
     const posts = await Post.find({ user: req.user.userId })
       .populate("user", USER_PUBLIC_FIELDS)
+      .populate("linkedPets", "_id name type image")
       .sort({ createdAt: -1 });
 
     posts.forEach(hydratePostImages);
@@ -502,6 +551,12 @@ const updateOwnPostStatus = async (req, res, next) => {
       });
     }
 
+    if (post.status === POST_STATUS.DISABLED) {
+      return res.status(400).json({
+        message: "Edit the post and select an active pet before changing its status",
+      });
+    }
+
     post.status = requestedStatus;
     await post.save();
     await post.populate("user", USER_PUBLIC_FIELDS);
@@ -529,7 +584,24 @@ const updatePost = async (req, res, next) => {
 
     const { type, title, description, location, price, currency } = req.body;
     const petType = getPetTypeInput(req.body);
+    const petIdsInput = getLinkedPetIdsInput(req.body);
     const profileType = await getAuthorProfileType(req.user.userId);
+
+    if (petIdsInput !== undefined) {
+      const petIds = normalizePetIds(petIdsInput);
+      if (!petIds) {
+        return res.status(400).json({ message: "Invalid linked pet selection" });
+      }
+      const linkedPets = await findOwnedPetIds(petIds, req.user.userId);
+      if (!linkedPets) {
+        return res.status(403).json({ message: "Posts can only link to your own pets" });
+      }
+      post.linkedPets = linkedPets;
+      if (post.status === POST_STATUS.DISABLED && linkedPets.length > 0) {
+        post.status = POST_STATUS.PUBLISHED;
+        post.disabledReason = "";
+      }
+    }
 
     if (type !== undefined) {
       const normalizedType = normalizePostType(type);
@@ -592,6 +664,7 @@ const updatePost = async (req, res, next) => {
 
     const updatedPost = await post.save();
     await updatedPost.populate("user", USER_PUBLIC_FIELDS);
+    await updatedPost.populate("linkedPets", "_id name type image");
     hydratePostImages(updatedPost);
 
     res.status(200).json(updatedPost);

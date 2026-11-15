@@ -16,4 +16,4 @@ export const CURRENCY_OPTIONS = [
   { value: "TRY", label: "Turkish Lira" },
 ];
 
-export const DEFAULT_CURRENCY = "TND";
+export const DEFAULT_CURRENCY = "EUR";

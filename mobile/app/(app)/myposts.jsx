@@ -47,12 +47,14 @@ function capitalize(str) {
 const STATUS_STYLES = {
   published: { bg: "#E8F8EE", text: GREEN },
   resolved: { bg: "#EAF2FF", text: "#356DB2" },
+  disabled: { bg: "#FFF2DF", text: "#A56B17" },
   blocked: { bg: "#FEECEC", text: "#D63031" },
 };
 
 function normalizePostStatus(status) {
   const value = String(status || "published").toLowerCase();
   if (value === "resolved") return "resolved";
+  if (value === "disabled") return "disabled";
   if (["blocked", "rejected", "archived"].includes(value)) return "blocked";
   return "published";
 }
@@ -84,6 +86,7 @@ function PostRow({ item, onStatusChange, statusUpdating }) {
   const displayStatus = normalizePostStatus(item?.status);
   const isBlocked = displayStatus === "blocked";
   const isResolved = displayStatus === "resolved";
+  const isDisabled = displayStatus === "disabled";
   const canOpen = displayStatus === "published";
   const tColor = typeColor(item?.type);
 
@@ -94,9 +97,14 @@ function PostRow({ item, onStatusChange, statusUpdating }) {
         styles.card,
         isBlocked && styles.cardBlocked,
         isResolved && styles.cardResolved,
+        isDisabled && styles.cardDisabled,
       ]}
       disabled={isBlocked}
-      onPress={() => canOpen && postId && router.push(`/post/${postId}`)}
+      onPress={() => {
+        if (!postId) return;
+        if (isDisabled) router.push(`/post/edit/${postId}`);
+        else if (canOpen) router.push(`/post/${postId}`);
+      }}
     >
       <Image source={{ uri: imageUri }} style={styles.cardImage} />
 
@@ -134,6 +142,12 @@ function PostRow({ item, onStatusChange, statusUpdating }) {
           )}
         </View>
 
+        {isDisabled && item?.disabledReason === "pet_deleted" ? (
+          <ThemedText style={styles.disabledReason} numberOfLines={2}>
+            This post was disabled because its linked pet was deleted. Tap to edit and select another pet.
+          </ThemedText>
+        ) : null}
+
         {/* Bottom row: likes + date */}
         <View style={styles.bottomRow}>
           <View style={styles.likesBlock}>
@@ -152,7 +166,7 @@ function PostRow({ item, onStatusChange, statusUpdating }) {
       <TouchableOpacity
         style={styles.menuBtn}
         activeOpacity={0.7}
-        disabled={isBlocked}
+        disabled={isBlocked || isDisabled}
         onPress={() => onStatusChange?.(item)}
         hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
       >
@@ -163,13 +177,15 @@ function PostRow({ item, onStatusChange, statusUpdating }) {
             name={
               isBlocked
                 ? "lock-closed-outline"
+                : isDisabled
+                ? "alert-circle-outline"
                 : isResolved
                 ? "refresh-circle-outline"
                 : "checkmark-circle-outline"
             }
             size={22}
             color={
-              isBlocked ? "#B0BAB5" : isResolved ? "#356DB2" : GREEN
+              isBlocked ? "#B0BAB5" : isDisabled ? "#A56B17" : isResolved ? "#356DB2" : GREEN
             }
           />
         )}
@@ -347,7 +363,7 @@ export default function MyPosts({ embedded = false, onCountChange } = {}) {
               <View style={styles.pageHeaderText}>
                 <ThemedText style={styles.pageTitle}>My Posts</ThemedText>
                 <ThemedText style={styles.pageSubtitle}>
-                  Manage published, resolved, and moderated posts
+                  Manage published, resolved, and pet-disabled posts
                 </ThemedText>
               </View>
               <TouchableOpacity
@@ -475,6 +491,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#C9DDF7",
   },
+  cardDisabled: {
+    borderColor: "#EED7B3",
+    backgroundColor: "#FFFCF7",
+  },
   cardImage: {
     width: 78,
     height: 78,
@@ -517,6 +537,11 @@ const styles = StyleSheet.create({
   statusTagText: {
     fontSize: 12,
     fontWeight: "600",
+  },
+  disabledReason: {
+    color: "#8A652E",
+    fontSize: 11,
+    lineHeight: 15,
   },
   bottomRow: {
     flexDirection: "row",

@@ -1,5 +1,6 @@
 const Comment = require("../models/Comment");
 const Post = require("../models/Post");
+const mongoose = require("mongoose");
 const { createNotification } = require("../services/notificationService");
 const { USER_PUBLIC_FIELDS } = require("../constants/userPublicFields");
 const {
@@ -16,7 +17,7 @@ const findPublishedPost = (postId) =>
 
 const createComment = async (req, res, next) => {
   try {
-    const { post, user, text } = req.body;
+    const { post, user, text, parentComment } = req.body;
     const finalUserId = req.user?.userId || user;
 
     if (!post || !text?.trim()) {
@@ -35,7 +36,30 @@ const createComment = async (req, res, next) => {
       throw new Error("Post not found");
     }
 
-    const comment = await Comment.create({ post, user: finalUserId, text: text.trim() });
+    let parent = null;
+    if (parentComment) {
+      if (!mongoose.isValidObjectId(parentComment)) {
+        res.status(400);
+        throw new Error("Invalid parent comment");
+      }
+
+      parent = await Comment.findOne({
+        _id: parentComment,
+        post,
+      }).select("user");
+
+      if (!parent) {
+        res.status(400);
+        throw new Error("Parent comment must belong to this post");
+      }
+    }
+
+    const comment = await Comment.create({
+      post,
+      user: finalUserId,
+      text: text.trim(),
+      parentComment: parent?._id || null,
+    });
 
     postExists.commentsCount = await Comment.countDocuments({ post });
     await postExists.save();
@@ -59,6 +83,24 @@ const createComment = async (req, res, next) => {
       },
     });
 
+    if (parent && String(parent.user) !== String(postExists.user._id || postExists.user)) {
+      await createNotification({
+        recipient: parent.user,
+        actor: finalUserId,
+        type: "comment",
+        title: "New reply to your comment",
+        body: `${
+          populatedComment?.user?.name || populatedComment?.user?.email || "Someone"
+        } replied to your comment on "${postExists.title}".`,
+        resourceType: "post",
+        resourceId: postExists._id,
+        data: {
+          post: postExists._id,
+          comment: comment._id,
+        },
+      });
+    }
+
     res.status(201).json(populatedComment);
   } catch (error) {
     next(error);
@@ -76,6 +118,11 @@ const getCommentsByPost = async (req, res, next) => {
 
     const comments = await Comment.find({ post: postId })
       .populate("user", USER_PUBLIC_FIELDS)
+      .populate({
+        path: "parentComment",
+        select: "_id text user",
+        populate: { path: "user", select: USER_PUBLIC_FIELDS },
+      })
       .sort({ createdAt: -1 });
 
     res.status(200).json(comments);
@@ -91,6 +138,11 @@ const getMyComments = async (req, res, next) => {
     const comments = await Comment.find({ user: userId })
       .populate("post", "_id title image images type user")
       .populate("user", USER_PUBLIC_FIELDS)
+      .populate({
+        path: "parentComment",
+        select: "_id text user",
+        populate: { path: "user", select: USER_PUBLIC_FIELDS },
+      })
       .sort({ createdAt: -1 });
 
     res.status(200).json(comments);
@@ -132,7 +184,11 @@ const updateComment = async (req, res, next) => {
     const populatedComment = await Comment.findById(comment._id).populate(
       "user",
       USER_PUBLIC_FIELDS
-    );
+    ).populate({
+      path: "parentComment",
+      select: "_id text user",
+      populate: { path: "user", select: USER_PUBLIC_FIELDS },
+    });
 
     res.status(200).json(populatedComment);
   } catch (error) {
@@ -161,6 +217,10 @@ const deleteComment = async (req, res, next) => {
       throw new Error("Not authorized to delete this comment");
     }
 
+    await Comment.updateMany(
+      { parentComment: comment._id },
+      { $set: { parentComment: comment.parentComment || null } }
+    );
     await comment.deleteOne();
 
     const post = await Post.findById(comment.post);

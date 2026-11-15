@@ -5,6 +5,7 @@ import { Image, Platform, StatusBar, StyleSheet, View } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { UserProvider } from "../contexts/UserContext";
+import { PreferencesProvider } from "../contexts/PreferencesContext";
 import { useUser } from "../contexts/UserContext";
 import { preloadLocationSearchOptions } from "../constants/locationOptions";
 import { palette } from "../constants/designSystem";
@@ -63,7 +64,7 @@ function AppBootstrap() {
     return (
       <View style={styles.splashContainer}>
         <Image
-          source={require("../assets/startup-splash.png")}
+          source={require("../assets/semsem-icon.png")}
           style={styles.splashImage}
           resizeMode="contain"
         />
@@ -91,7 +92,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <UserProvider>
-        <AppBootstrap />
+        <PreferencesProvider>
+          <AppBootstrap />
+        </PreferencesProvider>
       </UserProvider>
     </SafeAreaProvider>
   );

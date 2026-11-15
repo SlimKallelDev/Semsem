@@ -41,6 +41,7 @@ import {
 import { getPostById, updatePost } from "../../../services/postService";
 import { getPetsByOwner } from "../../../services/petService";
 import { useUser } from "../../../contexts/UserContext";
+import { usePreferences } from "../../../contexts/PreferencesContext";
 
 const MAX_IMAGES = 5;
 const PET_TYPE_OPTIONS = ["Dog", "Cat", "Bird", "Rabbit", "Other"];
@@ -65,6 +66,7 @@ const titleCase = (value) => {
 export default function EditPostScreen() {
   const { id } = useLocalSearchParams();
   const { user } = useUser();
+  const { currency: preferredCurrency } = usePreferences();
   const insets = useSafeAreaInsets();
 
   const currentUserId = useMemo(
@@ -282,7 +284,7 @@ export default function EditPostScreen() {
 
     if (nextType !== POST_TYPES.SALE) {
       setPrice("");
-      setCurrency(DEFAULT_CURRENCY);
+      setCurrency(preferredCurrency);
     }
   };
 
@@ -316,9 +318,19 @@ export default function EditPostScreen() {
           ? ""
           : String(data.price)
       );
-      setCurrency(String(data?.currency || DEFAULT_CURRENCY).toUpperCase());
-      setSelectedPetIds([]);
-      applyExistingPetType(data?.petType || "");
+      setCurrency(String(data?.currency || preferredCurrency || DEFAULT_CURRENCY).toUpperCase());
+      const linkedPets = Array.isArray(data?.linkedPets) ? data.linkedPets : [];
+      const linkedPetIds = linkedPets.map(getEntityId).filter(Boolean);
+      setSelectedPetIds(linkedPetIds.map(String));
+      const linkedPetTypes = new Set(
+        linkedPets.map((pet) => titleCase(pet?.type).toLowerCase()).filter(Boolean)
+      );
+      const manualPetType = String(data?.petType || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter((item) => item && !linkedPetTypes.has(titleCase(item).toLowerCase()))
+        .join(", ");
+      applyExistingPetType(manualPetType);
       setCountry(data?.location?.country || "");
       setGovernorate(data?.location?.governorate || data?.location?.city || "");
     } catch (error) {
@@ -475,6 +487,7 @@ export default function EditPostScreen() {
         title: title.trim(),
         description: description.trim(),
         images: effectiveImages,
+        petIds: selectedPetIds,
         ...(selectedType === POST_TYPES.SALE
           ? {
               price: normalizedSalePrice,
@@ -538,6 +551,12 @@ export default function EditPostScreen() {
             <ThemedText type="title" style={styles.pageTitle}>
               Update Post
             </ThemedText>
+
+            {post?.disabledReason === "pet_deleted" ? (
+              <ThemedText style={styles.deletedPetNotice}>
+                This post was disabled because its linked pet was deleted. Select an active pet to publish it again.
+              </ThemedText>
+            ) : null}
 
             <ThemedText style={styles.label}>Type</ThemedText>
             <View style={styles.typeSelectWrap}>
@@ -889,6 +908,17 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     marginBottom: 18,
+  },
+  deletedPetNotice: {
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#EED7B3",
+    backgroundColor: "#FFFCF7",
+    color: "#8A652E",
+    fontSize: 13,
+    lineHeight: 19,
   },
   label: {
     marginBottom: 6,

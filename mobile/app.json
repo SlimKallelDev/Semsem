@@ -13,12 +13,12 @@
       "fallbackToCacheTimeout": 0
     },
     "orientation": "portrait",
-    "icon": "./assets/startup-splash.png",
+    "icon": "./assets/semsem-icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.semsem.pets",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -26,16 +26,16 @@
     },
     "android": {
       "package": "com.semsem.pets",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/startup-splash.png",
+        "foregroundImage": "./assets/semsem-icon.png",
         "backgroundColor": "#59BE56"
       }
     },
     "web": {
-      "favicon": "./assets/startup-splash.png",
+      "favicon": "./assets/semsem-icon.png",
       "splash": {
-        "image": "./assets/startup-splash.png",
+        "image": "./assets/semsem-icon.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff"
       }
@@ -53,7 +53,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/startup-splash.png",
+          "image": "./assets/semsem-icon.png",
           "imageWidth": 180,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"

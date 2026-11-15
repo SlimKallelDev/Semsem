@@ -6,6 +6,7 @@ const USER_STATUS = Object.freeze({
 const POST_STATUS = Object.freeze({
   PUBLISHED: "published",
   RESOLVED: "resolved",
+  DISABLED: "disabled",
   BLOCKED: "blocked",
 });
 

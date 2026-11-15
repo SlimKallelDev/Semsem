@@ -33,6 +33,9 @@ const populateNotificationQuery = (query) => {
   return current;
 };
 
+const getEntityId = (value) =>
+  value?._id || value?.id || value?.userId || value?.$id || value || null;
+
 const createNotification = async ({
   recipient,
   actor = null,
@@ -47,7 +50,7 @@ const createNotification = async ({
     return null;
   }
 
-  if (actor && String(actor) === String(recipient)) {
+  if (actor && recipient && String(getEntityId(actor)) === String(getEntityId(recipient))) {
     return null;
   }
 

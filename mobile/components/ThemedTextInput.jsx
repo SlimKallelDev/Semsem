@@ -2,8 +2,10 @@ import { StyleSheet, TextInput } from "react-native";
 
 import { Colors } from "../constants/Colors";
 import { radii } from "../constants/designSystem";
+import { usePreferences } from "../contexts/PreferencesContext";
 
-const ThemedTextInput = ({ style, placeholderTextColor, ...props }) => {
+const ThemedTextInput = ({ style, placeholderTextColor, placeholder, ...props }) => {
+  const { t, language } = usePreferences();
   const theme = Colors.light;
 
   return (
@@ -18,7 +20,10 @@ const ThemedTextInput = ({ style, placeholderTextColor, ...props }) => {
           color: theme.title,
         },
         style,
+        language === "ar" ? styles.rtlInput : null,
       ]}
+      writingDirection={language === "ar" ? "rtl" : "ltr"}
+      placeholder={typeof placeholder === "string" ? t(placeholder) : placeholder}
       {...props}
     />
   );
@@ -34,6 +39,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
   },
+  rtlInput: { textAlign: "right" },
 });
 
 export default ThemedTextInput;

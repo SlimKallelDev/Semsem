@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   Keyboard,
   ActivityIndicator,
-  Text,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -122,7 +121,7 @@ export default function Register() {
                 Join Our Pet Community
               </ThemedText>
               <ThemedText type="subtitle" style={styles.subtitle}>
-                Create account and meet new furry friends
+                Sign up to meet new furry friends
               </ThemedText>
 
               <Spacer height={30} />
@@ -217,7 +216,7 @@ export default function Register() {
                 {loading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.buttonText}>Create Account</Text>
+                  <ThemedText style={styles.buttonText}>Sign up</ThemedText>
                 )}
               </ThemedButton>
 

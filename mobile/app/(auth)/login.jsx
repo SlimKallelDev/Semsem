@@ -8,7 +8,6 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   ActivityIndicator,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -71,7 +70,7 @@ export default function Login() {
       await login(email.trim(), password);
       router.replace(destination);
     } catch (err) {
-      setError(err.message || "Login failed. Please try again.");
+      setError(err.message || "Sign in failed. Please try again.");
       setSubmittingLogin(false);
     }
   };
@@ -113,7 +112,7 @@ export default function Login() {
                 Welcome Back!
               </ThemedText>
               <ThemedText type="subtitle" style={styles.subtitle}>
-                Login to connect with pet lovers
+                Sign in to connect with pet lovers
               </ThemedText>
 
               <Spacer height={30} />
@@ -148,7 +147,7 @@ export default function Login() {
                 {loading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.buttonText}>Sign In</Text>
+                  <ThemedText style={styles.buttonText}>Sign in</ThemedText>
                 )}
               </ThemedButton>
 

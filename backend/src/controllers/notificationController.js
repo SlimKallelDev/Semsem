@@ -10,7 +10,15 @@ const buildNotificationFilter = (req, extra = {}) => {
   if (req.query.type) {
     filter.type = req.query.type;
   } else if (req.query.excludeType) {
-    filter.type = { $ne: req.query.excludeType };
+    const excludedTypes = String(req.query.excludeType)
+      .split(",")
+      .map((type) => type.trim())
+      .filter(Boolean);
+    if (excludedTypes.length === 1) {
+      filter.type = { $ne: excludedTypes[0] };
+    } else if (excludedTypes.length > 1) {
+      filter.type = { $nin: excludedTypes };
+    }
   }
 
   return filter;

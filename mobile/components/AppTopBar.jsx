@@ -29,7 +29,7 @@ export default function AppTopBar({
   const handleProfilePress = () => {
     if (user) {
       router.push({
-        pathname: "/profile",
+        pathname: "/account",
         params: {
           returnTo: pathname || "/home",
         },
@@ -74,6 +74,8 @@ export default function AppTopBar({
               onPress={handleProfilePress}
               style={styles.iconButton}
               activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Open your profile"
             >
               {user ? (
                 <Image source={{ uri: avatarUri }} style={styles.profileImage} />

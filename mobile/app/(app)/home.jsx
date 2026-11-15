@@ -6,15 +6,10 @@ import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import MeetGrid from "../../components/home/MeetGrid";
 import PostsFeed from "../../components/home/PostsFeed";
 import ServicesDirectory from "../../components/home/ServicesDirectory";
-import SharedLocationFilterBar from "../../components/location/SharedLocationFilterBar";
 import ThemedText from "../../components/ThemedText";
-import {
-  CHROME_DIVIDER_COLOR,
-  CHROME_DIVIDER_HEIGHT,
-} from "../../constants/chromeLayout";
 import { PROFILE_TYPES } from "../../constants/profileTypes";
 
-/** Vertical rhythm: logo row → segmented tabs → section title + location */
+/** Vertical rhythm for the section selector and its optional filter row. */
 const CHROME_TOOLBAR_GAP = 12;
 
 /** Home shell — restrained palette, same accent; emphasis via space & typography */
@@ -24,7 +19,6 @@ const PAGE_BG = "#F2F5F2";
 const SURFACE = "#FFFFFF";
 const TRACK = "#EBF5EF";
 const TRACK_BORDER = "#D8E8E0";
-const TEXT_MAIN = "#1A231E";
 const TEXT_MUTED = "#5C6C64";
 const RADIUS_LG = 20;
 const RADIUS_MD = 16;
@@ -37,7 +31,7 @@ const TABS = [
   },
   {
     value: "meet",
-    label: "Pets to Meet",
+    label: "Meet",
     iconFamily: "mci",
     icon: "heart-search",
   },
@@ -84,24 +78,9 @@ const SERVICE_FILTERS = [
   })),
 ];
 const SECTION_META = {
-  feed: {
-    title: "Latest Posts",
-    iconFamily: "ion",
-    icon: "newspaper-outline",
-    filters: FEED_FILTERS,
-  },
-  meet: {
-    title: "Pets to Meet",
-    iconFamily: "mci",
-    icon: "heart-search",
-    filters: PET_FILTERS,
-  },
-  services: {
-    title: "Services",
-    iconFamily: "mci",
-    icon: "handshake-outline",
-    filters: SERVICE_FILTERS,
-  },
+  feed: { filters: FEED_FILTERS },
+  meet: { filters: PET_FILTERS },
+  services: { filters: SERVICE_FILTERS },
 };
 
 export default function Home() {
@@ -164,60 +143,48 @@ export default function Home() {
   return (
     <View style={styles.container}>
       <View style={styles.topNavWrap}>
-        <View style={styles.segmentedNav}>
-          {TABS.map((tab) => {
-            const active = activeTab === tab.value;
+        <View style={styles.sectionNavRow}>
+          <View style={styles.segmentedNav}>
+            {TABS.map((tab) => {
+              const active = activeTab === tab.value;
 
-            return (
-              <TouchableOpacity
-                key={tab.value}
-                style={[styles.navButton, active && styles.navButtonActive]}
-                activeOpacity={0.82}
-                onPress={() => handleChangeTab(tab.value)}
-              >
-                {renderIcon(tab, active)}
-                <ThemedText
-                  style={[styles.navButtonText, active && styles.navButtonTextActive]}
-                  numberOfLines={1}
+              return (
+                <TouchableOpacity
+                  key={tab.value}
+                  style={[styles.navButton, active && styles.navButtonActive]}
+                  activeOpacity={0.82}
+                  onPress={() => handleChangeTab(tab.value)}
                 >
-                  {tab.label}
-                </ThemedText>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        <View style={styles.toolbarDivider} />
-
-        <View style={styles.sectionToolbarRow}>
-          <View style={styles.sectionHeadLeft}>
-            <View style={styles.sectionIconWrap}>
-              {renderIcon(activeMeta, false, 16)}
-            </View>
-            <ThemedText style={styles.sectionTitle} numberOfLines={1}>
-              {activeMeta.title}
-            </ThemedText>
-            <TouchableOpacity
-              style={styles.categoryTriangleBtn}
-              activeOpacity={0.7}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              onPress={() => setFilterMenuOpen((value) => !value)}
-              accessibilityRole="button"
-              accessibilityLabel={`${activeMeta.title}: ${activeFilter.label}`}
-              accessibilityHint="Opens category filter options"
-            >
-              <View style={styles.categoryTriangleInner}>
-                <MaterialCommunityIcons
-                  name={filterMenuOpen ? "menu-up" : "menu-down"}
-                  size={18}
-                  color={ACCENT_MUTED}
-                />
-              </View>
-            </TouchableOpacity>
+                  {renderIcon(tab, active)}
+                  <ThemedText
+                    style={[styles.navButtonText, active && styles.navButtonTextActive]}
+                    numberOfLines={1}
+                  >
+                    {tab.label}
+                  </ThemedText>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-          <View style={styles.locationSlot}>
-            <SharedLocationFilterBar />
-          </View>
+
+          <TouchableOpacity
+            style={[styles.filterButton, filterMenuOpen && styles.filterButtonActive]}
+            activeOpacity={0.82}
+            onPress={() => setFilterMenuOpen((value) => !value)}
+            accessibilityRole="button"
+            accessibilityLabel={`Filter ${TABS.find((tab) => tab.value === activeTab)?.label || "section"}; selected ${activeFilter.label}`}
+            accessibilityHint="Opens filters for the selected section"
+            accessibilityState={{ expanded: filterMenuOpen }}
+          >
+            <Ionicons
+              name="filter-outline"
+              size={21}
+              color={filterMenuOpen ? SURFACE : ACCENT_MUTED}
+            />
+            {activeFilterValue !== activeMeta.filters[0].value ? (
+              <View style={styles.filterIndicator} />
+            ) : null}
+          </TouchableOpacity>
         </View>
 
         {filterMenuOpen ? (
@@ -271,8 +238,6 @@ const styles = StyleSheet.create({
   },
   topNavWrap: {
     backgroundColor: SURFACE,
-    borderBottomWidth: CHROME_DIVIDER_HEIGHT,
-    borderBottomColor: CHROME_DIVIDER_COLOR,
     paddingHorizontal: 16,
     paddingTop: CHROME_TOOLBAR_GAP,
     paddingBottom: CHROME_TOOLBAR_GAP,
@@ -283,7 +248,14 @@ const styles = StyleSheet.create({
     elevation: 2,
     zIndex: 10,
   },
+  sectionNavRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   segmentedNav: {
+    flex: 1,
+    minWidth: 0,
     minHeight: 48,
     borderRadius: RADIUS_LG,
     backgroundColor: TRACK,
@@ -323,68 +295,30 @@ const styles = StyleSheet.create({
     color: SURFACE,
     fontWeight: "800",
   },
-  toolbarDivider: {
-    height: CHROME_DIVIDER_HEIGHT,
-    backgroundColor: CHROME_DIVIDER_COLOR,
-    marginTop: CHROME_TOOLBAR_GAP,
-    marginHorizontal: -2,
-  },
-  sectionToolbarRow: {
-    marginTop: CHROME_TOOLBAR_GAP,
-    paddingTop: 2,
-    minHeight: 46,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  sectionHeadLeft: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  categoryTriangleBtn: {
-    justifyContent: "center",
-    alignItems: "center",
-    paddingLeft: 4,
-    marginLeft: 2,
-  },
-  categoryTriangleInner: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: TRACK,
+  filterButton: {
+    width: 44,
+    height: 48,
+    borderRadius: RADIUS_LG,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: TRACK_BORDER,
+    backgroundColor: TRACK,
     alignItems: "center",
     justifyContent: "center",
   },
-  locationSlot: {
-    flexShrink: 0,
-    justifyContent: "center",
-    alignItems: "flex-end",
-    maxWidth: "46%",
+  filterButtonActive: {
+    backgroundColor: ACCENT,
+    borderColor: ACCENT,
   },
-  sectionIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "#F4FAF6",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(61, 184, 92, 0.18)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 10,
-  },
-  sectionTitle: {
-    flex: 1,
-    color: TEXT_MAIN,
-    fontSize: 16,
-    fontWeight: "800",
-    letterSpacing: -0.35,
-    marginRight: 6,
-    lineHeight: 21,
+  filterIndicator: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: ACCENT,
+    borderWidth: 1,
+    borderColor: SURFACE,
   },
   filterMenu: {
     gap: 10,

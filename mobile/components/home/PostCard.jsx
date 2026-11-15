@@ -4,6 +4,8 @@ import { router } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { useUser } from "../../contexts/UserContext";
+import { usePreferences, getLocaleForLanguage } from "../../contexts/PreferencesContext";
+import { convertCurrencyAmount, formatCurrencyAmount } from "../../services/currencyService";
 import {
   getLikesCount,
   isPostLiked,
@@ -116,28 +118,11 @@ function parseCommentsCount(post) {
   return Number.isFinite(count) ? count : 0;
 }
 
-function formatSalePrice(post) {
-  const rawPrice = post?.price ?? post?.salePrice ?? post?.priceAmount;
-  const price = Number(String(rawPrice ?? "").trim().replace(",", "."));
-
-  if (!Number.isFinite(price) || price <= 0) return "";
-
-  return Number.isInteger(price)
-    ? String(price)
-    : price.toFixed(2).replace(/\.?0+$/, "");
-}
-
-function formatSaleBadgeLabel(post, categoryMeta) {
-  if (categoryMeta !== CATEGORY_STYLES.sale) return categoryMeta.label;
-
-  const price = formatSalePrice(post);
-  const currency = String(post?.currency || post?.priceCurrency || "")
-    .trim()
-    .toUpperCase();
-
-  return price && currency
-    ? `${categoryMeta.label} - ${price} ${currency}`
-    : categoryMeta.label;
+function formatSaleBadgeLabel(post, categoryMeta, formattedSalePrice, translate) {
+  if (categoryMeta !== CATEGORY_STYLES.sale) return translate(categoryMeta.label);
+  return formattedSalePrice
+    ? `${translate(categoryMeta.label)} - ${formattedSalePrice}`
+    : translate(categoryMeta.label);
 }
 
 function getEntityId(value) {
@@ -168,12 +153,17 @@ function getPostImageUri(post) {
 
 export default function PostCard({ post, inGroupedSection = false }) {
   const { user } = useUser();
+  const { currency: preferredCurrency, language, t } = usePreferences();
   const categoryMeta = getCategoryMeta(post.type);
-  const categoryBadgeLabel = formatSaleBadgeLabel(post, categoryMeta);
+  const [formattedSalePrice, setFormattedSalePrice] = useState("");
+  const categoryBadgeLabel = formatSaleBadgeLabel(post, categoryMeta, formattedSalePrice, t);
   const statusMeta = getStatusMeta(post.status);
   const isVeterinaryAuthor = isVeterinaryUser(post?.user);
   const petType = post.petType || "Unknown";
   const postId = post?._id || post?.id;
+  const linkedPets = Array.isArray(post?.linkedPets)
+    ? post.linkedPets.filter((pet) => getEntityId(pet))
+    : [];
   const postImageUri = getPostImageUri(post);
   const authorId = useMemo(() => getEntityId(post?.user), [post?.user]);
   const userId = useMemo(
@@ -187,6 +177,35 @@ export default function PostCard({ post, inGroupedSection = false }) {
     parseCommentsCount(post)
   );
   const [likeSubmitting, setLikeSubmitting] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const rawPrice = post?.price ?? post?.salePrice ?? post?.priceAmount;
+    const amount = Number(String(rawPrice ?? "").trim().replace(",", "."));
+    const sourceCurrency = String(post?.currency || post?.priceCurrency || "")
+      .trim()
+      .toUpperCase();
+
+    if (categoryMeta !== CATEGORY_STYLES.sale || !Number.isFinite(amount) || amount <= 0 || !sourceCurrency) {
+      setFormattedSalePrice("");
+      return () => { active = false; };
+    }
+
+    if (sourceCurrency === preferredCurrency) {
+      setFormattedSalePrice(formatCurrencyAmount(amount, preferredCurrency, getLocaleForLanguage(language)));
+    } else {
+      setFormattedSalePrice("");
+      convertCurrencyAmount(amount, sourceCurrency, preferredCurrency).then((converted) => {
+        if (!active) return;
+        const displayCurrency = converted === null ? sourceCurrency : preferredCurrency;
+        const displayAmount = converted === null ? amount : converted;
+        const formatted = formatCurrencyAmount(displayAmount, displayCurrency, getLocaleForLanguage(language));
+        setFormattedSalePrice(converted === null ? formatted : `≈ ${formatted}`);
+      });
+    }
+
+    return () => { active = false; };
+  }, [categoryMeta, language, post?.currency, post?.price, post?.priceAmount, post?.priceCurrency, post?.salePrice, preferredCurrency]);
 
   const formatLocation = () => {
     if (!post.location) return "";
@@ -297,17 +316,19 @@ export default function PostCard({ post, inGroupedSection = false }) {
         ]}
       >
         <View style={styles.imageWrapper}>
-          {!!postImageUri ? (
-            <Image
-              source={{ uri: postImageUri }}
-              style={styles.image}
-              resizeMode="contain"
-            />
-          ) : (
-            <View style={styles.imagePlaceholder}>
-              <MaterialCommunityIcons name="paw" size={42} color="#C5D9CC" />
-            </View>
-          )}
+          <View style={styles.imageViewport}>
+            {!!postImageUri ? (
+              <Image
+                source={{ uri: postImageUri }}
+                style={styles.image}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <MaterialCommunityIcons name="paw" size={42} color="#C5D9CC" />
+              </View>
+            )}
+          </View>
 
           <View
             style={[
@@ -372,6 +393,32 @@ export default function PostCard({ post, inGroupedSection = false }) {
               {petType}
             </ThemedText>
           </View>
+
+          {linkedPets.length ? (
+            <View style={styles.linkedPetsRow}>
+              {linkedPets.map((pet) => {
+                const petId = getEntityId(pet);
+                return (
+                  <TouchableOpacity
+                    key={String(petId)}
+                    style={styles.linkedPetChip}
+                    activeOpacity={0.8}
+                    accessibilityRole="link"
+                    onPress={(event) => {
+                      event?.stopPropagation?.();
+                      router.push(`/pet/${petId}`);
+                    }}
+                  >
+                    <MaterialCommunityIcons name="paw" size={14} color="#2E8F4B" />
+                    <ThemedText style={styles.linkedPetText} numberOfLines={1}>
+                      {pet?.name || "View pet"}
+                    </ThemedText>
+                    <Ionicons name="open-outline" size={12} color="#548064" />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : null}
 
           {!!formatLocation() && (
             <View style={styles.detailRow}>
@@ -483,16 +530,21 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
     backgroundColor: "#FCFEFD",
   },
-  image: {
+  imageViewport: {
     width: "100%",
     height: 232,
     borderRadius: 16,
+    overflow: "hidden",
     backgroundColor: "#F2F7F4",
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+    transform: [{ scale: 1.05 }],
   },
   imagePlaceholder: {
     width: "100%",
-    height: 232,
-    borderRadius: 16,
+    height: "100%",
     backgroundColor: "#F2F7F4",
     alignItems: "center",
     justifyContent: "center",
@@ -569,6 +621,30 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 5,
+  },
+  linkedPetsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+    marginTop: 2,
+  },
+  linkedPetChip: {
+    maxWidth: "100%",
+    minHeight: 28,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    borderRadius: 14,
+    backgroundColor: "#EFF8F1",
+    borderWidth: 1,
+    borderColor: "#D4E9D9",
+  },
+  linkedPetText: {
+    maxWidth: 150,
+    color: "#34734A",
+    fontSize: 11,
+    fontWeight: "700",
   },
   detailLabel: {
     marginLeft: 8,
