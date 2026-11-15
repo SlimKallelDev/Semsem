@@ -27,17 +27,10 @@ export default function AppTopBar({
   );
 
   const handleProfilePress = () => {
-    if (user) {
-      router.push({
-        pathname: "/account",
-        params: {
-          returnTo: pathname || "/home",
-        },
-      });
-      return;
-    }
-
-    router.push("/(auth)/login");
+    router.push({
+      pathname: "/profile",
+      params: { returnTo: pathname || "/home" },
+    });
   };
 
   const handleBackPress = () => {

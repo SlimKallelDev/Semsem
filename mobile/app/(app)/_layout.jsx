@@ -200,14 +200,16 @@ export default function AppLayout() {
     return (
       <View style={styles.btnWrap}>
         <TouchableOpacity
-          onPress={() => router.push({
-            pathname: "/account",
-            params: { returnTo: pathname || "/home" },
-          })}
+          onPress={() =>
+            router.push({
+              pathname: "/profile",
+              params: { returnTo: pathname || "/home" },
+            })
+          }
           style={styles.iconButton}
           activeOpacity={0.85}
           accessibilityRole="button"
-          accessibilityLabel={t("Open account and preferences")}
+          accessibilityLabel={t("Open profile and settings")}
         >
           {user ? (
             <Image source={{ uri: userAvatar }} style={styles.profileImage} />
@@ -384,23 +386,6 @@ export default function AppLayout() {
             }}
           />
 
-          <Tabs.Screen
-            name="profile"
-            options={{
-              href: null,
-              headerShown: false,
-              tabBarStyle: { display: "none" },
-            }}
-          />
-
-          <Tabs.Screen
-            name="account"
-            options={{
-              href: null,
-              headerShown: false,
-              tabBarStyle: { display: "none" },
-            }}
-          />
         </Tabs>
         {inAppAlert ? (
           <TouchableOpacity

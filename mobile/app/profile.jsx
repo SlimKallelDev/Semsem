@@ -20,28 +20,31 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import UserOnly from "../../components/auth/UserOnly";
-import LocationSelector from "../../components/location/LocationSelector";
-import ThemedText from "../../components/ThemedText";
+import CurrencySelector from "../components/CurrencySelector";
+import LocationSelector from "../components/location/LocationSelector";
+import ThemedText from "../components/ThemedText";
 import {
   resolveCountryName,
   resolveGovernorateForCountry,
-} from "../../constants/governorates";
+} from "../constants/governorates";
 import {
   DEFAULT_PROFILE_TYPE,
   PROFILE_TYPES,
   getProfileTypeLabel,
-} from "../../constants/profileTypes";
-import { useUser } from "../../contexts/UserContext";
-import { getPetsByOwner } from "../../services/petService";
-import { API_ORIGIN } from "../../services/api";
-import { getPostsByUser } from "../../services/postService";
+} from "../constants/profileTypes";
+import { useUser } from "../contexts/UserContext";
+import { CURRENCY_OPTIONS } from "../constants/currencies";
+import { getLanguageLabel, usePreferences } from "../contexts/PreferencesContext";
+import { getPetsByOwner } from "../services/petService";
+import { API_ORIGIN } from "../services/api";
+import { getPostsByUser } from "../services/postService";
 import {
   getUser,
   updateUser,
   updateUserAvatar,
   updateUserWithAvatar,
-} from "../../services/userService";
+  deleteUserAccount,
+} from "../services/userService";
 
 const GREEN = "#3DB85C";
 const GREEN_DARK = "#2A9448";
@@ -100,6 +103,14 @@ const pluralize = (count, singular, plural = `${singular}s`) => {
 
 export default function ProfileScreen() {
   const { user, setUser, logout } = useUser();
+  const {
+    currency,
+    language,
+    languageOptions,
+    setCurrency,
+    setLanguage,
+    t,
+  } = usePreferences();
   const insets = useSafeAreaInsets();
   const { returnTo: rawReturnTo } = useLocalSearchParams();
 
@@ -118,6 +129,7 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [editVisible, setEditVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [avatarSaving, setAvatarSaving] = useState(false);
   const [form, setForm] = useState(INITIAL_FORM);
   const [selectedAvatar, setSelectedAvatar] = useState(null);
@@ -192,6 +204,86 @@ export default function ProfileScreen() {
     profile?.profileType || DEFAULT_PROFILE_TYPE
   );
   const memberSinceText = formatMemberSince(profile?.createdAt);
+
+  const preferencesSection = (
+    <>
+      <View style={styles.preferencesHeader}>
+        <ThemedText style={styles.sectionTitle}>Preferences</ThemedText>
+        <ThemedText style={styles.preferencesSubtitle}>
+          Make Semsem feel right for you.
+        </ThemedText>
+      </View>
+
+      <View style={styles.preferencesCard}>
+        <View style={styles.preferenceHeading}>
+          <View style={styles.preferenceIcon}>
+            <Ionicons name="cash-outline" size={18} color={GREEN_DARK} />
+          </View>
+          <View style={styles.preferenceCopy}>
+            <ThemedText style={styles.preferenceTitle}>Default currency</ThemedText>
+            <ThemedText style={styles.preferenceDescription}>
+              Choose the currency used to display sale prices.
+            </ThemedText>
+          </View>
+        </View>
+        <CurrencySelector
+          value={currency}
+          onChange={setCurrency}
+          buttonStyle={styles.currencyButton}
+        />
+        <ThemedText style={styles.preferenceNote}>
+          Converted prices are estimates based on daily exchange rates.
+        </ThemedText>
+        <ThemedText
+          style={styles.preferenceLink}
+          onPress={() => Linking.openURL("https://www.exchangerate-api.com")}
+          accessibilityRole="link"
+        >
+          Rates by ExchangeRate-API
+        </ThemedText>
+        <ThemedText style={styles.preferenceCount}>
+          {`${CURRENCY_OPTIONS.length} ${t("currencies available")}`}
+        </ThemedText>
+      </View>
+
+      <View style={styles.preferencesCard}>
+        <View style={styles.preferenceHeading}>
+          <View style={styles.preferenceIcon}>
+            <Ionicons name="language-outline" size={18} color={GREEN_DARK} />
+          </View>
+          <View style={styles.preferenceCopy}>
+            <ThemedText style={styles.preferenceTitle}>Language</ThemedText>
+            <ThemedText style={styles.preferenceDescription}>
+              Choose the language used across Semsem.
+            </ThemedText>
+          </View>
+        </View>
+        <View style={styles.languageOptions}>
+          {languageOptions.map((option) => {
+            const active = language === option.value;
+            return (
+              <TouchableOpacity
+                key={option.value}
+                style={[styles.languageOption, active && styles.languageOptionActive]}
+                onPress={() => setLanguage(option.value)}
+                activeOpacity={0.82}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={getLanguageLabel(option.value)}
+              >
+                <ThemedText
+                  style={[styles.languageOptionText, active && styles.languageOptionTextActive]}
+                >
+                  {option.label}
+                </ThemedText>
+                {active ? <Ionicons name="checkmark-circle" size={18} color={GREEN} /> : null}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    </>
+  );
 
   const openEditModal = () => {
     setForm({
@@ -386,6 +478,37 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleDeleteAccount = () => {
+    if (!userId || deletingAccount) return;
+
+    Alert.alert(
+      "Delete account permanently?",
+      "This will permanently delete your account, pets, posts, messages, and associated data. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete account",
+          style: "destructive",
+          onPress: async () => {
+            setDeletingAccount(true);
+            try {
+              await deleteUserAccount(userId);
+              await logout();
+              router.replace("/(auth)/login");
+            } catch (error) {
+              Alert.alert(
+                "Could not delete account",
+                error?.message || "Please try again."
+              );
+            } finally {
+              setDeletingAccount(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleCloseProfile = useCallback(() => {
     const nextPath =
       typeof returnToPath === "string" ? returnToPath.trim() : "";
@@ -400,18 +523,67 @@ export default function ProfileScreen() {
 
   if (loading) {
     return (
-      <UserOnly>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={GREEN} />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={GREEN} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!user) {
+    return (
+      <SafeAreaView style={[styles.safeArea, styles.guestSafeArea]} edges={["top", "bottom"]}>
+        <StatusBar barStyle="dark-content" backgroundColor={BACKDROP} />
+        <View style={styles.guestHeader}>
+          <TouchableOpacity
+            style={styles.guestCloseButton}
+            onPress={handleCloseProfile}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Ionicons name="chevron-back" size={23} color="#344239" />
+          </TouchableOpacity>
+          <ThemedText style={styles.guestHeaderTitle}>Profile</ThemedText>
+          <View style={styles.guestHeaderSpacer} />
+        </View>
+        <ScrollView
+          contentContainerStyle={styles.guestContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.guestCard}>
+            <View style={styles.guestIcon}>
+              <Ionicons name="paw" size={28} color={GREEN_DARK} />
+            </View>
+            <ThemedText style={styles.guestTitle}>Welcome to Semsem</ThemedText>
+            <ThemedText style={styles.guestDescription}>
+              Sign in to view your profile, or create an account to join the pet community.
+            </ThemedText>
+            <View style={styles.guestActions}>
+              <TouchableOpacity
+                style={styles.guestPrimaryButton}
+                onPress={() => router.push({ pathname: "/(auth)/login", params: { returnTo: "/profile" } })}
+                activeOpacity={0.85}
+              >
+                <ThemedText style={styles.guestPrimaryText}>Sign in</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.guestSecondaryButton}
+                onPress={() => router.push("/(auth)/register")}
+                activeOpacity={0.85}
+              >
+                <ThemedText style={styles.guestSecondaryText}>Create account</ThemedText>
+              </TouchableOpacity>
+            </View>
           </View>
-        </SafeAreaView>
-      </UserOnly>
+          {preferencesSection}
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
   return (
-    <UserOnly>
       <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
         <StatusBar barStyle="dark-content" backgroundColor={BACKDROP} />
 
@@ -570,6 +742,8 @@ export default function ProfileScreen() {
                 </View>
                 </View>
 
+              {preferencesSection}
+
               {/* ── Logout ── */}
               <TouchableOpacity
                 style={styles.safetyStandardsButton}
@@ -580,15 +754,6 @@ export default function ProfileScreen() {
                 <ThemedText style={styles.safetyStandardsText}>
                   Child Safety Standards
                 </ThemedText>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.deleteAccountButton}
-                activeOpacity={0.85}
-                onPress={() => Linking.openURL(`${API_ORIGIN}/account-deletion`)}
-              >
-                <Ionicons name="trash-outline" size={19} color="#B63232" />
-                <ThemedText style={styles.deleteAccountText}>Delete Account</ThemedText>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -775,12 +940,35 @@ export default function ProfileScreen() {
                 <ThemedText style={styles.charCount}>
                   {form.bio.length}/240
                 </ThemedText>
+
+                <View style={styles.deleteAccountSection}>
+                  <ThemedText style={styles.deleteAccountTitle}>Delete account</ThemedText>
+                  <ThemedText style={styles.deleteAccountDescription}>
+                    Permanently remove your Semsem account and its associated data.
+                  </ThemedText>
+                  <TouchableOpacity
+                    style={styles.deleteAccountButton}
+                    onPress={handleDeleteAccount}
+                    activeOpacity={0.84}
+                    disabled={deletingAccount || saving}
+                    accessibilityRole="button"
+                    accessibilityLabel="Permanently delete your account"
+                  >
+                    {deletingAccount ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+                    )}
+                    <ThemedText style={styles.deleteAccountText}>
+                      {deletingAccount ? "Deleting account…" : "Delete account permanently"}
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
               </ScrollView>
             </KeyboardAvoidingView>
           </SafeAreaView>
         </Modal>
       </SafeAreaView>
-    </UserOnly>
   );
 }
 
@@ -789,6 +977,73 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BACKDROP,
   },
+  guestSafeArea: {
+    paddingHorizontal: 18,
+  },
+  guestHeader: {
+    minHeight: 54,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  guestCloseButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  guestHeaderTitle: { fontSize: 18, fontWeight: "900", color: "#17201A" },
+  guestHeaderSpacer: { width: 42 },
+  guestContent: { gap: 18, paddingTop: 18, paddingBottom: 38 },
+  guestCard: {
+    alignItems: "center",
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: "#FFFFFF",
+  },
+  guestIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 21,
+    backgroundColor: SOFT_GREEN,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  guestTitle: { marginTop: 14, fontSize: 22, fontWeight: "900", color: "#17201A" },
+  guestDescription: {
+    marginTop: 7,
+    color: "#647169",
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: "center",
+  },
+  guestActions: { width: "100%", flexDirection: "row", gap: 10, marginTop: 20 },
+  guestPrimaryButton: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    backgroundColor: GREEN,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  guestPrimaryText: { color: "#FFFFFF", fontSize: 14, fontWeight: "900" },
+  guestSecondaryButton: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: "#F8FBF8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  guestSecondaryText: { color: GREEN_DARK, fontSize: 14, fontWeight: "900" },
   screen: {
     flex: 1,
     backgroundColor: BACKDROP,
@@ -997,6 +1252,49 @@ const styles = StyleSheet.create({
     color: "#131915",
     marginBottom: 14,
   },
+  preferencesHeader: { marginTop: 22, marginBottom: 2 },
+  preferencesSubtitle: { marginTop: -8, marginBottom: 12, color: "#78847C", fontSize: 13 },
+  preferencesCard: {
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: "#FFFFFF",
+    gap: 12,
+    marginBottom: 12,
+  },
+  preferenceHeading: { flexDirection: "row", alignItems: "center", gap: 10 },
+  preferenceIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: SOFT_GREEN,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  preferenceCopy: { flex: 1, minWidth: 0 },
+  preferenceTitle: { color: "#17201A", fontSize: 15, fontWeight: "800" },
+  preferenceDescription: { marginTop: 2, color: "#647169", fontSize: 12.5, lineHeight: 18 },
+  currencyButton: { minHeight: 46 },
+  preferenceNote: { color: "#647169", fontSize: 12, lineHeight: 17 },
+  preferenceLink: { color: GREEN_DARK, fontSize: 11, textDecorationLine: "underline" },
+  preferenceCount: { color: GREEN_DARK, fontSize: 11.5, fontWeight: "700" },
+  languageOptions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  languageOption: {
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: "#FAFCFA",
+  },
+  languageOptionActive: { borderColor: GREEN, backgroundColor: SOFT_GREEN },
+  languageOptionText: { color: "#647169", fontSize: 13, fontWeight: "700" },
+  languageOptionTextActive: { color: GREEN_DARK, fontWeight: "900" },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1208,18 +1506,26 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF7F7",
   },
   deleteAccountButton: {
-    minHeight: 50,
-    marginTop: 18,
+    minHeight: 48,
     paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: "#F0D5D5",
     borderRadius: 14,
-    backgroundColor: "#FFF8F8",
+    backgroundColor: "#B6323C",
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 8,
   },
+  deleteAccountSection: {
+    marginTop: 30,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#F0D5D5",
+    borderRadius: 18,
+    backgroundColor: "#FFF8F8",
+    gap: 9,
+  },
+  deleteAccountTitle: { color: "#A92D35", fontSize: 16, fontWeight: "900" },
+  deleteAccountDescription: { color: "#7F686A", fontSize: 13, lineHeight: 19 },
   safetyStandardsButton: {
     minHeight: 50,
     marginTop: 18,
@@ -1238,8 +1544,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   deleteAccountText: {
-    color: "#B63232",
-    fontWeight: "700",
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900",
   },
   logoutText: {
     fontSize: 16,

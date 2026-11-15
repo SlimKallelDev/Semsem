@@ -3,6 +3,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   FlatList,
   Image,
   RefreshControl,
@@ -87,7 +88,6 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const hasNotifications = useRef(false);
   const hasLoadedNotifications = useRef(false);
 
   const unreadCount = useMemo(
@@ -95,7 +95,7 @@ export default function NotificationsScreen() {
     [notifications]
   );
 
-  const loadNotifications = useCallback(async (isRefresh = false) => {
+  const loadNotifications = useCallback(async (isRefresh = false, silent = false) => {
     if (!user) {
       setNotifications([]);
       setLoading(false);
@@ -104,15 +104,14 @@ export default function NotificationsScreen() {
     }
 
     try {
-      if (isRefresh) {
+      if (isRefresh && !silent) {
         setRefreshing(true);
-      } else if (!hasNotifications.current) {
+      } else if (!hasLoadedNotifications.current) {
         setLoading(true);
       }
       setError(null);
       const data = await getNotifications(NOTIFICATION_FILTER);
       setNotifications(Array.isArray(data) ? data : []);
-      hasNotifications.current = Array.isArray(data) && data.length > 0;
       hasLoadedNotifications.current = true;
     } catch (loadError) {
       console.log("Notifications page error:", loadError?.message || loadError);
@@ -126,6 +125,20 @@ export default function NotificationsScreen() {
   useFocusEffect(
     useCallback(() => {
       loadNotifications();
+      const refreshInBackground = () => {
+        if (AppState.currentState === "active") {
+          loadNotifications(false, true);
+        }
+      };
+      const interval = setInterval(refreshInBackground, 30000);
+      const appState = AppState.addEventListener("change", (state) => {
+        if (state === "active") loadNotifications(false, true);
+      });
+
+      return () => {
+        clearInterval(interval);
+        appState.remove();
+      };
     }, [loadNotifications])
   );
 
@@ -135,7 +148,6 @@ export default function NotificationsScreen() {
       getCachedNotifications(NOTIFICATION_FILTER).then((cached) => {
         if (active && !hasLoadedNotifications.current && Array.isArray(cached) && cached.length) {
           setNotifications(cached);
-          hasNotifications.current = true;
           hasLoadedNotifications.current = true;
           setLoading(false);
         }
@@ -144,7 +156,10 @@ export default function NotificationsScreen() {
     return () => { active = false; };
   }, [user]);
 
-  useEffect(() => subscribeNetworkRestored(() => loadNotifications(true)), [loadNotifications]);
+  useEffect(
+    () => subscribeNetworkRestored(() => loadNotifications(false, true)),
+    [loadNotifications]
+  );
 
   useEffect(() => {
     if (!initializing && !user) {

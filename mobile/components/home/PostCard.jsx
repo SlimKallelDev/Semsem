@@ -404,6 +404,7 @@ export default function PostCard({ post, inGroupedSection = false }) {
                     style={styles.linkedPetChip}
                     activeOpacity={0.8}
                     accessibilityRole="link"
+                    accessibilityLabel={`${t("View profile")}: ${pet?.name || t("View pet")}`}
                     onPress={(event) => {
                       event?.stopPropagation?.();
                       router.push(`/pet/${petId}`);
@@ -413,7 +414,12 @@ export default function PostCard({ post, inGroupedSection = false }) {
                     <ThemedText style={styles.linkedPetText} numberOfLines={1}>
                       {pet?.name || "View pet"}
                     </ThemedText>
-                    <Ionicons name="open-outline" size={12} color="#548064" />
+                    <View style={styles.linkedPetAction}>
+                      <ThemedText style={styles.linkedPetActionText}>
+                        {t("View profile")}
+                      </ThemedText>
+                      <Ionicons name="chevron-forward" size={12} color="#2E8F4B" />
+                    </View>
                   </TouchableOpacity>
                 );
               })}
@@ -641,11 +647,13 @@ const styles = StyleSheet.create({
     borderColor: "#D4E9D9",
   },
   linkedPetText: {
-    maxWidth: 150,
+    maxWidth: 120,
     color: "#34734A",
     fontSize: 11,
     fontWeight: "700",
   },
+  linkedPetAction: { flexDirection: "row", alignItems: "center", gap: 2 },
+  linkedPetActionText: { color: "#2E8F4B", fontSize: 10, fontWeight: "900" },
   detailLabel: {
     marginLeft: 8,
     marginRight: 6,

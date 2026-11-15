@@ -64,7 +64,11 @@ function AppBootstrap() {
     return (
       <View style={styles.splashContainer}>
         <Image
-          source={require("../assets/semsem-icon.png")}
+          source={Platform.select({
+            android: require("../assets/semsem-android-512.png"),
+            ios: require("../assets/semsem-ios-1024.png"),
+            default: require("../assets/semsem-ios-1024.png"),
+          })}
           style={styles.splashImage}
           resizeMode="contain"
         />
