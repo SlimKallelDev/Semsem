@@ -67,14 +67,14 @@ export default function SharedLocationFilterBar() {
     }
 
     if (nearbySummary) {
-      return `Posts and pets around ${nearbySummary}`;
+      return `Posts, pets, and services around ${nearbySummary}`;
     }
 
     if (!locationDetectionEnabled) {
       return "Activate detect location first";
     }
 
-    return "Posts and pets around your location";
+    return "Posts, pets, and services around your location";
   }, [locationDetectionEnabled, locationLoading, nearbySummary]);
 
   const pillMeta = useMemo(() => {
@@ -263,7 +263,7 @@ export default function SharedLocationFilterBar() {
                 <View style={styles.optionBody}>
                   <ThemedText style={styles.optionTitle}>All over the world</ThemedText>
                   <ThemedText style={styles.optionDesc}>
-                    Browse posts and pets globally
+                    Browse posts, pets, and services globally
                   </ThemedText>
                 </View>
                 {mode === "worldwide" && (

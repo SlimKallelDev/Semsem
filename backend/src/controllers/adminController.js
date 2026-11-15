@@ -595,6 +595,14 @@ const deleteUser = async (req, res, next) => {
     const postIds = posts.map((item) => item._id);
     const petIds = pets.map((item) => item._id);
     const conversationIds = conversations.map((item) => item._id);
+    const commentIds = await Comment.distinct("_id", {
+      $or: [{ user: target._id }, { post: { $in: postIds } }],
+    });
+
+    await Comment.updateMany(
+      { parentComment: { $in: commentIds } },
+      { $set: { parentComment: null } }
+    );
 
     await Promise.all([
       Appointment.deleteMany({

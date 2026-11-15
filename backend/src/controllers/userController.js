@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const UserReview = require("../models/UserReview");
+const mongoose = require("mongoose");
 const { deleteAccountData } = require("../services/accountDeletionService");
 const bcrypt = require("bcryptjs");
 const { uploadAvatarBuffer } = require("../services/cloudinaryService");
@@ -47,9 +48,17 @@ const mapUserWithProfileType = (user) => {
   return userJson;
 };
 
-const recalculateUserRatingStats = async (targetUserId) => {
+const toReviewTargetId = (targetUserId) => {
+  if (targetUserId instanceof mongoose.Types.ObjectId) return targetUserId;
+  const value = String(targetUserId || "");
+  return mongoose.Types.ObjectId.isValid(value)
+    ? new mongoose.Types.ObjectId(value)
+    : targetUserId;
+};
+
+const getUserRatingStats = async (targetUserId) => {
   const stats = await UserReview.aggregate([
-    { $match: { targetUser: targetUserId } },
+    { $match: { targetUser: toReviewTargetId(targetUserId) } },
     {
       $group: {
         _id: "$targetUser",
@@ -59,7 +68,7 @@ const recalculateUserRatingStats = async (targetUserId) => {
     },
   ]);
 
-  const nextStats = stats[0]
+  return stats[0]
     ? {
         ratingAverage: normalizeRatingAverage(stats[0].ratingAverage),
         ratingCount: normalizeRatingCount(stats[0].ratingCount),
@@ -68,6 +77,10 @@ const recalculateUserRatingStats = async (targetUserId) => {
         ratingAverage: 0,
         ratingCount: 0,
       };
+};
+
+const recalculateUserRatingStats = async (targetUserId) => {
+  const nextStats = await getUserRatingStats(targetUserId);
 
   await User.updateOne({ _id: targetUserId }, { $set: nextStats });
   return nextStats;
@@ -166,7 +179,33 @@ const getUsers = async (req, res, next) => {
     const users = await User.find({ status: USER_STATUS.ACTIVE }).select(
       "-password"
     );
-    const usersWithProfileType = users.map(mapUserWithProfileType);
+    const ratingGroups = await UserReview.aggregate([
+      {
+        $group: {
+          _id: "$targetUser",
+          ratingAverage: { $avg: "$rating" },
+          ratingCount: { $sum: 1 },
+        },
+      },
+    ]);
+    const statsByUserId = new Map(
+      ratingGroups.map((stats) => [
+        String(stats._id),
+        {
+          ratingAverage: normalizeRatingAverage(stats.ratingAverage),
+          ratingCount: normalizeRatingCount(stats.ratingCount),
+        },
+      ])
+    );
+    const usersWithProfileType = users.map((user) =>
+      mapUserWithProfileType({
+        ...user.toObject(),
+        ...(statsByUserId.get(String(user._id)) || {
+          ratingAverage: 0,
+          ratingCount: 0,
+        }),
+      })
+    );
     res.status(200).json(usersWithProfileType);
   } catch (error) {
     next(error);
@@ -194,7 +233,13 @@ const getUser = async (req, res, next) => {
       );
     }
 
-    res.status(200).json(mapUserWithProfileType(user));
+    const ratingStats = await getUserRatingStats(user._id);
+    res.status(200).json(
+      mapUserWithProfileType({
+        ...user.toObject(),
+        ...ratingStats,
+      })
+    );
   } catch (error) {
     next(error);
   }

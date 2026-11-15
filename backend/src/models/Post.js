@@ -54,6 +54,19 @@ const postSchema = new mongoose.Schema(
       index: true,
     },
 
+    linkedPets: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Pet",
+      },
+    ],
+
+    disabledReason: {
+      type: String,
+      enum: ["", "pet_deleted"],
+      default: "",
+    },
+
     price: {
       type: Number,
       min: [0, "Price cannot be negative"],

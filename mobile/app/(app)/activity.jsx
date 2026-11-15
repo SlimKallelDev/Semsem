@@ -16,6 +16,7 @@ import { useUser } from "../../contexts/UserContext";
 import { getAppointments } from "../../services/appointmentService";
 import { getMyComments } from "../../services/commentService";
 import { getMyLikes } from "../../services/likeService";
+import { getNotifications } from "../../services/notificationService";
 
 const GREEN = "#3DB85C";
 const BORDER = "#E1ECE5";
@@ -108,6 +109,34 @@ const buildCommentActivity = (comment) => {
     title: "You commented on a post",
     body: text ? `${text} - ${postTitle}` : postTitle,
     timestamp: comment?.createdAt,
+    target: { type: "post", id: postId },
+  };
+};
+
+const buildReceivedEngagementActivity = (notification, currentUserId) => {
+  const postId =
+    getEntityId(notification?.data?.post) ||
+    (notification?.resourceType === "post" ? getEntityId(notification?.resourceId) : null);
+  const type = notification?.type;
+  if (!postId || !["like", "comment"].includes(type)) return null;
+  if (String(getEntityId(notification?.actor)) === String(currentUserId)) return null;
+  const isReply = type === "comment" && /reply/i.test(notification?.title || "");
+  const actorName = getDisplayName(notification?.actor);
+  const postTitle = getPostTitle(notification?.data?.post);
+  const commentText = String(notification?.data?.comment?.text || "").trim();
+
+  return {
+    id: `received-${type}-${notification?._id || notification?.id || postId}`,
+    type,
+    title: type === "like"
+      ? "Someone liked your post"
+      : isReply
+        ? "Someone replied to your comment"
+        : "Someone commented on your post",
+    body: type === "comment"
+      ? `${actorName}: ${commentText || postTitle}`
+      : `${actorName} · ${postTitle}`,
+    timestamp: notification?.createdAt,
     target: { type: "post", id: postId },
   };
 };
@@ -219,10 +248,12 @@ export default function ActivityScreen() {
       }
 
       setError("");
-      const [likesData, commentsData, appointmentsData] = await Promise.all([
+      const [likesData, commentsData, appointmentsData, receivedLikes, receivedComments] = await Promise.all([
         getMyLikes(),
         getMyComments(),
         getAppointments(),
+        getNotifications({ type: "like" }).catch(() => []),
+        getNotifications({ type: "comment" }).catch(() => []),
       ]);
 
       const likeItems = (Array.isArray(likesData) ? likesData : [])
@@ -236,7 +267,17 @@ export default function ActivityScreen() {
         : []
       ).flatMap((appointment) => buildAppointmentActivities(appointment, userId));
 
-      const nextActivity = [...likeItems, ...commentItems, ...appointmentItems].sort(
+      const receivedEngagementItems = [
+        ...(Array.isArray(receivedLikes) ? receivedLikes : []),
+        ...(Array.isArray(receivedComments) ? receivedComments : []),
+      ].map((notification) => buildReceivedEngagementActivity(notification, userId)).filter(Boolean);
+
+      const nextActivity = [
+        ...likeItems,
+        ...commentItems,
+        ...receivedEngagementItems,
+        ...appointmentItems,
+      ].sort(
         (left, right) =>
           new Date(right?.timestamp || 0).getTime() -
           new Date(left?.timestamp || 0).getTime()
@@ -351,9 +392,9 @@ export default function ActivityScreen() {
               <Ionicons name="pulse-outline" size={28} color={GREEN} />
             </View>
             <View style={styles.headerText}>
-              <ThemedText style={styles.title}>Activity</ThemedText>
+              <ThemedText style={styles.title}>My Activity</ThemedText>
               <ThemedText style={styles.subtitle}>
-                Your likes, comments, and appointment history
+                Your likes, comments, post engagement, and appointment history
               </ThemedText>
             </View>
           </View>
@@ -365,8 +406,8 @@ export default function ActivityScreen() {
             </View>
             <ThemedText style={styles.emptyTitle}>No activity yet</ThemedText>
             <ThemedText style={styles.emptyText}>
-              Posts you like, comments you write, and appointment changes you make
-              will appear here.
+              Posts you like, comments you write, engagement on your posts, and
+              appointment changes you make will appear here.
             </ThemedText>
           </View>
         }

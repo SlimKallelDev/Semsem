@@ -1,11 +1,12 @@
 const Pet = require("../models/Pet");
 const User = require("../models/User");
+const Post = require("../models/Post");
 const {
   USER_PROFILE_TYPES,
   normalizeProfileType,
 } = require("../constants/profileTypes");
 const { uploadPetImageBuffer } = require("../services/cloudinaryService");
-const { USER_STATUS } = require("../constants/moderationStatuses");
+const { POST_STATUS, USER_STATUS } = require("../constants/moderationStatuses");
 
 const OWNER_FIELDS =
   "_id name email avatar image governorate country profileType ratingAverage ratingCount";
@@ -622,6 +623,43 @@ const deletePet = async (req, res, next) => {
     const isAdmin = req.user.role === "admin";
     if (!isOwner && !isAdmin) {
       return res.status(403).json({ message: "Not authorized to delete this pet" });
+    }
+
+    const relatedPosts = await Post.find({ linkedPets: pet._id }).populate(
+      "linkedPets",
+      "_id type"
+    );
+
+    for (const post of relatedPosts) {
+      const existingLinkedPets = Array.isArray(post.linkedPets) ? post.linkedPets : [];
+      const remainingPets = existingLinkedPets.filter(
+        (linkedPet) => String(linkedPet?._id || linkedPet) !== String(pet._id)
+      );
+      post.linkedPets = remainingPets.map((linkedPet) => linkedPet?._id || linkedPet);
+
+      const existingTypes = String(post.petType || "")
+        .split(",")
+        .map((type) => type.trim())
+        .filter(Boolean);
+      const previousLinkedTypes = new Set(
+        existingLinkedPets
+          .map((linkedPet) => String(linkedPet?.type || "").trim().toLowerCase())
+          .filter(Boolean)
+      );
+      const manualTypes = existingTypes.filter(
+        (type) => !previousLinkedTypes.has(type.toLowerCase())
+      );
+      const remainingTypes = remainingPets
+        .map((linkedPet) => String(linkedPet?.type || "").trim())
+        .filter(Boolean);
+      post.petType = [...new Set([...remainingTypes, ...manualTypes])].join(", ");
+
+      if (remainingPets.length === 0 && manualTypes.length === 0) {
+        post.status = POST_STATUS.DISABLED;
+        post.disabledReason = "pet_deleted";
+      }
+
+      await post.save();
     }
 
     await pet.deleteOne();

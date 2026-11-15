@@ -80,6 +80,11 @@ const deleteAccountData = async (userId) => {
     );
   }
 
+  await Comment.updateMany(
+    { parentComment: { $in: commentIds } },
+    { $set: { parentComment: null } }
+  );
+
   await Promise.all([
     Pet.deleteMany({ owner: userId }),
     Post.deleteMany({ user: userId }),

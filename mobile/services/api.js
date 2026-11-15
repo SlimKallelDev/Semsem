@@ -43,7 +43,7 @@ const clearExpiredSession = async (apiMessage = "") => {
   if (!authExpiredNotified) {
     authExpiredNotified = true;
     const isBlocked = String(apiMessage).toLowerCase().includes("blocked by an administrator");
-    emitAuthExpired(isBlocked ? "Your account has been blocked by an administrator." : "Session expired. Please login again.");
+    emitAuthExpired(isBlocked ? "Your account has been blocked by an administrator." : "Session expired. Please sign in again.");
   }
 };
 export const resetAuthExpiredNotice = () => { authExpiredNotified = false; };

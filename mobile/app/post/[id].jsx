@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -177,6 +177,8 @@ export default function PostDetailsScreen() {
   const [comments, setComments] = useState([]);
   const [likes, setLikes] = useState([]);
   const [commentText, setCommentText] = useState("");
+  const [replyingTo, setReplyingTo] = useState(null);
+  const commentInputRef = useRef(null);
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editingCommentText, setEditingCommentText] = useState("");
@@ -195,6 +197,32 @@ export default function PostDetailsScreen() {
     () => normalizeImageList(post?.images, post?.image),
     [post?.image, post?.images]
   );
+  const commentsForDisplay = useMemo(() => {
+    const roots = comments.filter((comment) => !getEntityId(comment?.parentComment));
+    const repliesByParent = new Map();
+
+    comments.forEach((comment) => {
+      const parentId = getEntityId(comment?.parentComment);
+      if (!parentId) return;
+      const replies = repliesByParent.get(String(parentId)) || [];
+      replies.push(comment);
+      repliesByParent.set(String(parentId), replies);
+    });
+
+    const newestFirst = (a, b) =>
+      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+
+    const ordered = [];
+    const appendThread = (comment, depth) => {
+      ordered.push({ comment, depth });
+      (repliesByParent.get(String(comment._id)) || [])
+        .sort(newestFirst)
+        .forEach((reply) => appendThread(reply, depth + 1));
+    };
+
+    roots.sort(newestFirst).forEach((root) => appendThread(root, 0));
+    return ordered;
+  }, [comments]);
   const activeImage = postImages[activeImageIndex] || "";
   const hasMultipleImages = postImages.length > 1;
 
@@ -427,9 +455,11 @@ export default function PostDetailsScreen() {
         post: id,
         user: currentUserId,
         text: commentText.trim(),
+        ...(replyingTo?._id ? { parentComment: replyingTo._id } : {}),
       });
 
       setCommentText("");
+      setReplyingTo(null);
       await loadComments();
     } catch (error) {
       console.log("Create comment error:", error.message);
@@ -437,6 +467,16 @@ export default function PostDetailsScreen() {
     } finally {
       setCommentSubmitting(false);
     }
+  };
+
+  const handleReplyToComment = (comment) => {
+    if (!currentUserId) {
+      handleOpenLogin();
+      return;
+    }
+
+    setReplyingTo(comment);
+    requestAnimationFrame(() => commentInputRef.current?.focus());
   };
 
   const handleDeletePost = () => {
@@ -577,6 +617,7 @@ export default function PostDetailsScreen() {
         setEditingCommentId(null);
         setEditingCommentText("");
       }
+      if (replyingTo?._id === commentId) setReplyingTo(null);
 
       await loadComments();
     } catch (error) {
@@ -678,6 +719,32 @@ export default function PostDetailsScreen() {
             <ThemedText style={styles.meta}>
               {getPostTypeLabel(post.type)} | {(post.petType || "Pet").toString()}
             </ThemedText>
+
+            {Array.isArray(post?.linkedPets) && post.linkedPets.length > 0 ? (
+              <View style={styles.linkedPetsSection}>
+                <ThemedText style={styles.linkedPetsLabel}>Related pets</ThemedText>
+                <View style={styles.linkedPetsList}>
+                  {post.linkedPets.filter((pet) => getEntityId(pet)).map((pet) => {
+                    const petId = getEntityId(pet);
+                    return (
+                      <TouchableOpacity
+                        key={String(petId)}
+                        style={styles.linkedPetButton}
+                        activeOpacity={0.84}
+                        accessibilityRole="link"
+                        onPress={() => router.push(`/pet/${petId}`)}
+                      >
+                        <Ionicons name="paw" size={16} color="#2F8E4C" />
+                        <ThemedText style={styles.linkedPetButtonText} numberOfLines={1}>
+                          {pet?.name || "View pet"}
+                        </ThemedText>
+                        <Ionicons name="chevron-forward" size={15} color="#6D8B77" />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
 
             {!!locationText && (
               <ThemedText style={styles.location}>Location: {locationText}</ThemedText>
@@ -843,31 +910,47 @@ export default function PostDetailsScreen() {
               </ThemedText>
 
               {currentUserId ? (
-                <View style={styles.commentInputRow}>
-                  <TextInput
-                    style={styles.commentInput}
-                    placeholder="Write a comment..."
-                    value={commentText}
-                    onChangeText={setCommentText}
-                    multiline
-                  />
-                  <TouchableOpacity
-                    style={[
-                      styles.commentSendButton,
-                      commentSubmitting && styles.disabledButton,
-                    ]}
-                    onPress={handleAddComment}
-                    disabled={commentSubmitting}
-                  >
-                    <ThemedText style={styles.commentSendText}>
-                      {commentSubmitting ? "..." : "Send"}
-                    </ThemedText>
-                  </TouchableOpacity>
-                </View>
+                <>
+                  {replyingTo ? (
+                    <View style={styles.replyingToRow}>
+                      <ThemedText style={styles.replyingToText} numberOfLines={1}>
+                        Replying to {getDisplayName(replyingTo.user)}
+                      </ThemedText>
+                      <TouchableOpacity
+                        onPress={() => setReplyingTo(null)}
+                        activeOpacity={0.8}
+                      >
+                        <ThemedText style={styles.cancelReplyText}>Cancel</ThemedText>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+                  <View style={styles.commentInputRow}>
+                    <TextInput
+                      ref={commentInputRef}
+                      style={styles.commentInput}
+                      placeholder={replyingTo ? "Write a reply..." : "Write a comment..."}
+                      value={commentText}
+                      onChangeText={setCommentText}
+                      multiline
+                    />
+                    <TouchableOpacity
+                      style={[
+                        styles.commentSendButton,
+                        commentSubmitting && styles.disabledButton,
+                      ]}
+                      onPress={handleAddComment}
+                      disabled={commentSubmitting}
+                    >
+                      <ThemedText style={styles.commentSendText}>
+                        {commentSubmitting ? "..." : replyingTo ? "Reply" : "Send"}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                </>
               ) : (
                 <View style={styles.commentLoginPrompt}>
                   <ThemedText style={styles.commentLoginText}>
-                    Login to join the conversation.
+                    Sign in to join the conversation.
                   </ThemedText>
                   <TouchableOpacity
                     style={styles.inlineLoginButton}
@@ -876,7 +959,7 @@ export default function PostDetailsScreen() {
                   >
                     <Ionicons name="log-in-outline" size={16} color="#444444" />
                     <ThemedText style={styles.inlineLoginButtonText}>
-                      Login
+                      Sign in
                     </ThemedText>
                   </TouchableOpacity>
                 </View>
@@ -885,8 +968,9 @@ export default function PostDetailsScreen() {
               {comments.length === 0 ? (
                 <ThemedText style={styles.emptyText}>No comments yet.</ThemedText>
               ) : (
-                comments.map((comment) => {
+                commentsForDisplay.map(({ comment, depth }) => {
                   const commentOwnerId = getEntityId(comment?.user);
+                  const isReply = depth > 0;
                   const canOpenCommentAuthor = Boolean(commentOwnerId);
                   const isOwnComment =
                     !!currentUserId &&
@@ -900,6 +984,10 @@ export default function PostDetailsScreen() {
                       key={comment._id}
                       style={[
                         styles.commentCard,
+                        isReply && [
+                          styles.commentReplyCard,
+                          { marginLeft: Math.min(depth, 4) * 14 },
+                        ],
                         isVeterinaryUser(comment?.user) && styles.commentCardVeterinary,
                       ]}
                     >
@@ -933,32 +1021,46 @@ export default function PostDetailsScreen() {
                           ) : null}
                         </TouchableOpacity>
 
-                        {isOwnComment && !isEditing ? (
+                        {!isEditing ? (
                           <View style={styles.commentOwnerActions}>
                             <TouchableOpacity
-                              onPress={() => startEditComment(comment)}
+                              onPress={() => handleReplyToComment(comment)}
                               disabled={!!deletingCommentId}
                               activeOpacity={0.8}
                             >
-                              <ThemedText style={styles.commentOwnerActionText}>
-                                Edit
+                              <ThemedText style={styles.commentReplyActionText}>
+                                Reply
                               </ThemedText>
                             </TouchableOpacity>
 
-                            <TouchableOpacity
-                              onPress={() => promptDeleteComment(comment._id)}
-                              disabled={!!deletingCommentId}
-                              activeOpacity={0.8}
-                            >
-                              <ThemedText
-                                style={[
-                                  styles.commentOwnerActionText,
-                                  styles.commentOwnerDeleteText,
-                                ]}
-                              >
-                                {isDeleting ? "Deleting..." : "Delete"}
-                              </ThemedText>
-                            </TouchableOpacity>
+                            {isOwnComment ? (
+                              <>
+                                <TouchableOpacity
+                                  onPress={() => startEditComment(comment)}
+                                  disabled={!!deletingCommentId}
+                                  activeOpacity={0.8}
+                                >
+                                  <ThemedText style={styles.commentOwnerActionText}>
+                                    Edit
+                                  </ThemedText>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                  onPress={() => promptDeleteComment(comment._id)}
+                                  disabled={!!deletingCommentId}
+                                  activeOpacity={0.8}
+                                >
+                                  <ThemedText
+                                    style={[
+                                      styles.commentOwnerActionText,
+                                      styles.commentOwnerDeleteText,
+                                    ]}
+                                  >
+                                    {isDeleting ? "Deleting..." : "Delete"}
+                                  </ThemedText>
+                                </TouchableOpacity>
+                              </>
+                            ) : null}
                           </View>
                         ) : null}
                       </View>
@@ -1322,6 +1424,22 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     textTransform: "capitalize",
   },
+  linkedPetsSection: { marginTop: 12, gap: 7 },
+  linkedPetsLabel: { color: "#64746A", fontSize: 12, fontWeight: "700" },
+  linkedPetsList: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  linkedPetButton: {
+    minHeight: 38,
+    maxWidth: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 11,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#D2E7D7",
+    backgroundColor: "#F3FAF5",
+  },
+  linkedPetButtonText: { maxWidth: 180, color: "#34734A", fontSize: 13, fontWeight: "700" },
   location: {
     fontSize: 14,
     opacity: 0.8,
@@ -1545,6 +1663,25 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 16,
   },
+  replyingToRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingHorizontal: 2,
+    marginBottom: 8,
+  },
+  replyingToText: {
+    flex: 1,
+    color: "#58675F",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  cancelReplyText: {
+    color: "#31834B",
+    fontSize: 13,
+    fontWeight: "800",
+  },
   commentLoginPrompt: {
     borderRadius: 14,
     borderWidth: 1,
@@ -1604,6 +1741,12 @@ const styles = StyleSheet.create({
     borderColor: "#BFE9CF",
     backgroundColor: "#F6FFF9",
   },
+  commentReplyCard: {
+    marginLeft: 18,
+    borderLeftWidth: 3,
+    borderLeftColor: "#CFE8D6",
+    backgroundColor: "#F8FBF8",
+  },
   commentHeaderRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -1645,6 +1788,11 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: "700",
     color: "#4B5B53",
+  },
+  commentReplyActionText: {
+    fontSize: 12.5,
+    fontWeight: "800",
+    color: "#31834B",
   },
   commentOwnerDeleteText: {
     color: "#C74848",

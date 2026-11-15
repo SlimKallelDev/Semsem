@@ -23,6 +23,36 @@ const currentUserCacheSuffix = async () => {
   }
 };
 
+const excludedNotificationTypes = (params = {}) =>
+  String(params.excludeType || "")
+    .split(",")
+    .map((type) => type.trim())
+    .filter(Boolean);
+
+const filterExcludedTypes = (items, params) => {
+  if (!Array.isArray(items)) return items;
+  const excluded = new Set(excludedNotificationTypes(params));
+  return items.filter((item) => !excluded.has(item?.type));
+};
+
+const getFilteredNotificationCache = async (params = {}) => {
+  const user = await currentUserCacheSuffix();
+  const exactKey = `semsem:notifications:${user}${buildQueryString(params)}`;
+  let cached = await AsyncStorage.getItem(exactKey).catch(() => null);
+
+  if (!cached && excludedNotificationTypes(params).length > 0) {
+    const previousKey = `semsem:notifications:${user}${buildQueryString({ excludeType: "message" })}`;
+    cached = await AsyncStorage.getItem(previousKey).catch(() => null);
+  }
+
+  if (!cached) return null;
+  try {
+    return filterExcludedTypes(JSON.parse(cached), params);
+  } catch {
+    return null;
+  }
+};
+
 export const getNotifications = async (params) => {
   const query = buildQueryString(params);
   const key = `semsem:notifications:${await currentUserCacheSuffix()}${query}`;
@@ -32,18 +62,15 @@ export const getNotifications = async (params) => {
       AsyncStorage.setItem(key, JSON.stringify(data)).catch(() => {});
       return data;
     } catch (error) {
-      const cached = await AsyncStorage.getItem(key).catch(() => null);
-      if (cached) return JSON.parse(cached);
+      const cached = await getFilteredNotificationCache(params);
+      if (cached) return cached;
       throw error;
     }
   });
 };
 
 export const getCachedNotifications = async (params) => {
-  const key = `semsem:notifications:${await currentUserCacheSuffix()}${buildQueryString(params)}`;
-  const cached = await AsyncStorage.getItem(key).catch(() => null);
-  if (!cached) return null;
-  try { return JSON.parse(cached); } catch { return null; }
+  return getFilteredNotificationCache(params);
 };
 
 export const getUnreadNotificationCount = async (params) => {
@@ -58,6 +85,8 @@ export const getUnreadNotificationCount = async (params) => {
     } catch (error) {
       const cached = await AsyncStorage.getItem(key).catch(() => null);
       if (cached !== null) return Number(cached) || 0;
+      const cachedNotifications = await getFilteredNotificationCache(params);
+      if (cachedNotifications) return cachedNotifications.filter((item) => !item?.isRead).length;
       throw error;
     }
   });
@@ -66,7 +95,11 @@ export const getUnreadNotificationCount = async (params) => {
 export const getCachedUnreadNotificationCount = async (params) => {
   const key = `semsem:notification-count:${await currentUserCacheSuffix()}${buildQueryString(params)}`;
   const cached = await AsyncStorage.getItem(key).catch(() => null);
-  return cached === null ? null : Number(cached) || 0;
+  if (cached !== null) return Number(cached) || 0;
+  const cachedNotifications = await getFilteredNotificationCache(params);
+  return cachedNotifications
+    ? cachedNotifications.filter((item) => !item?.isRead).length
+    : null;
 };
 
 export const markNotificationAsRead = async (notificationId) => {

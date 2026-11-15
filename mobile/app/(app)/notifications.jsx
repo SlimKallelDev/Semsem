@@ -25,6 +25,7 @@ import {
 
 const GREEN = "#3DB85C";
 const BORDER = "#E1ECE5";
+const NOTIFICATION_FILTER = { excludeType: "message,like,comment" };
 const notificationStyles = {
   like: {
     icon: "heart",
@@ -109,7 +110,7 @@ export default function NotificationsScreen() {
         setLoading(true);
       }
       setError(null);
-      const data = await getNotifications({ excludeType: "message" });
+      const data = await getNotifications(NOTIFICATION_FILTER);
       setNotifications(Array.isArray(data) ? data : []);
       hasNotifications.current = Array.isArray(data) && data.length > 0;
       hasLoadedNotifications.current = true;
@@ -131,7 +132,7 @@ export default function NotificationsScreen() {
   useEffect(() => {
     let active = true;
     if (user) {
-      getCachedNotifications({ excludeType: "message" }).then((cached) => {
+      getCachedNotifications(NOTIFICATION_FILTER).then((cached) => {
         if (active && !hasLoadedNotifications.current && Array.isArray(cached) && cached.length) {
           setNotifications(cached);
           hasNotifications.current = true;
@@ -153,7 +154,7 @@ export default function NotificationsScreen() {
 
   const handleMarkAllRead = async () => {
     try {
-      await markAllNotificationsAsRead({ excludeType: "message" });
+      await markAllNotificationsAsRead(NOTIFICATION_FILTER);
       setNotifications((current) =>
         current.map((item) => ({
           ...item,
@@ -355,7 +356,7 @@ export default function NotificationsScreen() {
             </View>
             <ThemedText style={styles.emptyTitle}>No notifications yet</ThemedText>
             <ThemedText style={styles.emptyText}>
-              Likes, comments, appointment replies, and app updates will appear here.
+              Appointment updates and app alerts appear here. Post activity is in My Activity, and messages are in Messages.
             </ThemedText>
           </View>
         }

@@ -51,7 +51,7 @@ export const UserProvider = ({ children }) => {
         const isBlocked = String(message || "").toLowerCase().includes("blocked");
         Alert.alert(
           isBlocked ? "Account blocked" : "Session expired",
-          message || "Please login again."
+          message || "Please sign in again."
         );
       }
     });

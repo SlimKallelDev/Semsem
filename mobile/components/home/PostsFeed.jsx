@@ -1,6 +1,7 @@
 import {
   ActivityIndicator,
   FlatList,
+  Linking,
   StatusBar,
   StyleSheet,
   TouchableOpacity,
@@ -104,36 +105,47 @@ export default function PostsFeed({ selectedFilter = "All" }) {
         onRefresh={() => loadPosts(true)}
         contentContainerStyle={styles.listContent}
         ListFooterComponent={
-          isInitialLoading ? (
-            <View style={styles.loadingCard}>
-              <View style={styles.center}>
-                <ActivityIndicator size="large" color={GREEN} />
-                {backendStatus === "checking" ? <ThemedText style={styles.connectingText}>Connecting to Semsem...</ThemedText> : null}
+          <View>
+            {isInitialLoading ? (
+              <View style={styles.loadingCard}>
+                <View style={styles.center}>
+                  <ActivityIndicator size="large" color={GREEN} />
+                  {backendStatus === "checking" ? <ThemedText style={styles.connectingText}>Connecting to Semsem...</ThemedText> : null}
+                </View>
               </View>
-            </View>
-          ) : !loading && filteredPosts.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <View style={styles.emptyState}>
-                <MaterialCommunityIcons name="paw-off" size={42} color="#B9D8C1" />
-                <ThemedText style={styles.emptyTitle}>{feedError ? "Posts are temporarily unavailable" : "No posts yet"}</ThemedText>
-                <ThemedText style={styles.emptyText}>
-                  {feedError ? "Check your connection and try again." : "Try another category or change the area filter above."}
-                </ThemedText>
-                {feedError ? (
-                  <TouchableOpacity
-                    style={styles.retryButton}
-                    activeOpacity={0.84}
-                    onPress={() => loadPosts(true)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Try loading posts again"
-                  >
-                    <Ionicons name="refresh" size={16} color="#FFFFFF" />
-                    <ThemedText style={styles.retryButtonText}>Try again</ThemedText>
-                  </TouchableOpacity>
-                ) : null}
+            ) : !loading && filteredPosts.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <View style={styles.emptyState}>
+                  <MaterialCommunityIcons name="paw-off" size={42} color="#B9D8C1" />
+                  <ThemedText style={styles.emptyTitle}>{feedError ? "Posts are temporarily unavailable" : "No posts yet"}</ThemedText>
+                  <ThemedText style={styles.emptyText}>
+                    {feedError ? "Check your connection and try again." : "Try another category or change the area filter above."}
+                  </ThemedText>
+                  {feedError ? (
+                    <TouchableOpacity
+                      style={styles.retryButton}
+                      activeOpacity={0.84}
+                      onPress={() => loadPosts(true)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Try loading posts again"
+                    >
+                      <Ionicons name="refresh" size={16} color="#FFFFFF" />
+                      <ThemedText style={styles.retryButtonText}>Try again</ThemedText>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
               </View>
-            </View>
-          ) : null
+            ) : null}
+            {!loading && filteredPosts.some((post) => normalizePostType(post.type) === "sale") ? (
+              <ThemedText
+                style={styles.rateAttribution}
+                onPress={() => Linking.openURL("https://www.exchangerate-api.com")}
+                accessibilityRole="link"
+              >
+                Rates by ExchangeRate-API
+              </ThemedText>
+            ) : null}
+          </View>
         }
       />
 
@@ -185,6 +197,14 @@ const styles = StyleSheet.create({
     color: "#748079",
     fontSize: 13,
     fontWeight: "600",
+  },
+  rateAttribution: {
+    marginTop: 2,
+    marginBottom: 12,
+    marginHorizontal: 20,
+    color: "#55745F",
+    fontSize: 10,
+    textDecorationLine: "underline",
   },
   emptyState: {
     alignItems: "center",

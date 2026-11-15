@@ -37,9 +37,7 @@ function formatAge(dateValue) {
 
 function typeIcon(type) {
   const t = (type || "").toLowerCase();
-  if (t.includes("cat")) return "cat";
-  if (t.includes("dog")) return "paw";
-  if (t.includes("bird")) return "feather";
+  if (t.includes("bird")) return "leaf-outline";
   return "paw";
 }
 
@@ -171,7 +169,10 @@ export default function MyPetsScreen({ embedded = false, onCountChange } = {}) {
   }, [embedded, initializing, userId]);
 
   const handleDelete = (petId) => {
-    Alert.alert("Delete Pet", "Are you sure you want to delete this pet?", [
+    Alert.alert(
+      "Delete Pet",
+      "Posts linked only to this pet will be disabled. Posts linked to other pets will keep those pet links.",
+      [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
@@ -189,7 +190,8 @@ export default function MyPetsScreen({ embedded = false, onCountChange } = {}) {
           }
         },
       },
-    ]);
+      ]
+    );
   };
 
   if (loading) {

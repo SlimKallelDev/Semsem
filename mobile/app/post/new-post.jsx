@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -38,6 +38,7 @@ import {
   isPostTypeAllowedForProfileType,
 } from "../../constants/postTypes";
 import { useUser } from "../../contexts/UserContext";
+import { usePreferences } from "../../contexts/PreferencesContext";
 import { getPetsByOwner } from "../../services/petService";
 import { createPost } from "../../services/postService";
 
@@ -63,6 +64,7 @@ const titleCase = (value) => {
 
 export default function NewPostScreen() {
   const { user, initializing } = useUser();
+  const { currency: preferredCurrency } = usePreferences();
   const insets = useSafeAreaInsets();
   const [title, setTitle] = useState("");
   const [type, setType] = useState(POST_TYPES.GENERAL);
@@ -70,6 +72,7 @@ export default function NewPostScreen() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
+  const currencyChosenByUser = useRef(false);
   const [ownedPets, setOwnedPets] = useState([]);
   const [petsLoading, setPetsLoading] = useState(false);
   const [selectedPetIds, setSelectedPetIds] = useState([]);
@@ -93,6 +96,10 @@ export default function NewPostScreen() {
     [postTypeOptions, type]
   );
   const isSalePost = type === POST_TYPES.SALE;
+
+  useEffect(() => {
+    if (!currencyChosenByUser.current) setCurrency(preferredCurrency);
+  }, [preferredCurrency]);
   const userId = useMemo(() => getEntityId(user), [user]);
   const selectedPets = useMemo(() => {
     const selected = new Set(selectedPetIds.map((id) => String(id)));
@@ -207,7 +214,7 @@ export default function NewPostScreen() {
 
     if (nextType !== POST_TYPES.SALE) {
       setPrice("");
-      setCurrency(DEFAULT_CURRENCY);
+      setCurrency(preferredCurrency);
     }
   };
 
@@ -384,6 +391,7 @@ export default function NewPostScreen() {
         description: description.trim(),
         images: postImages,
         petType: derivedPetType,
+        petIds: selectedPetIds,
         ...(isSalePost
           ? {
               price: normalizedSalePrice,
@@ -510,7 +518,10 @@ export default function NewPostScreen() {
                   <ThemedText style={styles.label}>Currency</ThemedText>
                   <CurrencySelector
                     value={currency}
-                    onChange={setCurrency}
+                    onChange={(value) => {
+                      currencyChosenByUser.current = true;
+                      setCurrency(value);
+                    }}
                     buttonStyle={styles.currencySelectButton}
                   />
                 </View>

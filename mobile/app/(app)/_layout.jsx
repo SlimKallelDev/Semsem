@@ -5,8 +5,10 @@ import { AppState } from "react-native";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import SharedLocationFilterBar from "../../components/location/SharedLocationFilterBar";
 import { LocationFilterProvider } from "../../contexts/LocationFilterContext";
 import { useUser } from "../../contexts/UserContext";
+import { usePreferences } from "../../contexts/PreferencesContext";
 import { subscribeNetworkRestored } from "../../services/api";
 import { subscribeNotificationsUpdated } from "../../services/notificationEvents";
 import {
@@ -53,12 +55,18 @@ function FloatingHomeTabButton({
 
 export default function AppLayout() {
   const { user } = useUser();
+  const { t } = usePreferences();
   const pathname = usePathname();
+  const currentUserId = user?._id || user?.id || user?.$id || null;
   const insets = useSafeAreaInsets();
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [inAppAlert, setInAppAlert] = useState(null);
   const unreadRequest = useRef(null);
   const lastUnreadLoadAt = useRef(0);
+  const previousUnreadCounts = useRef(null);
+  const previousUserId = useRef(null);
+  const alertTimer = useRef(null);
 
   const isLoggedIn = !!user;
   const isHomeActive =
@@ -69,10 +77,22 @@ export default function AppLayout() {
     [user]
   );
 
+  useEffect(() => {
+    if (previousUserId.current === currentUserId) return;
+    previousUserId.current = currentUserId;
+    previousUnreadCounts.current = null;
+    lastUnreadLoadAt.current = 0;
+    setUnreadNotificationCount(0);
+    setUnreadMessageCount(0);
+    setInAppAlert(null);
+  }, [currentUserId]);
+
   const loadUnreadCounts = useCallback(async (force = false) => {
     if (!isLoggedIn) {
       setUnreadNotificationCount(0);
       setUnreadMessageCount(0);
+      previousUnreadCounts.current = null;
+      setInAppAlert(null);
       return;
     }
 
@@ -81,12 +101,35 @@ export default function AppLayout() {
     const task = (async () => {
       try {
         const [notificationCount, messageCount] = await Promise.all([
-        getUnreadNotificationCount({ excludeType: "message" }),
+        getUnreadNotificationCount({ excludeType: "message,like,comment" }),
         getUnreadNotificationCount({ type: "message" }),
         ]);
 
-        setUnreadNotificationCount(notificationCount);
-        setUnreadMessageCount(messageCount);
+        const nextCounts = {
+          notifications: Number(notificationCount) || 0,
+          messages: Number(messageCount) || 0,
+        };
+        const previous = previousUnreadCounts.current;
+        setUnreadNotificationCount(nextCounts.notifications);
+        setUnreadMessageCount(nextCounts.messages);
+        if (previous) {
+          const newMessages = nextCounts.messages > previous.messages;
+          const newNotifications = nextCounts.notifications > previous.notifications;
+          if (newMessages || newNotifications) {
+            setInAppAlert({
+              title: newMessages && newNotifications
+                ? t("New messages and notifications")
+                : newMessages
+                  ? t("New message received")
+                  : t("New notification received"),
+              route: newMessages ? "/messages" : "/notifications",
+              icon: newMessages ? "chatbubble-ellipses" : "notifications",
+            });
+            if (alertTimer.current) clearTimeout(alertTimer.current);
+            alertTimer.current = setTimeout(() => setInAppAlert(null), 6000);
+          }
+        }
+        previousUnreadCounts.current = nextCounts;
         lastUnreadLoadAt.current = Date.now();
       } catch (error) {
         console.log("Load unread notifications error:", error.message);
@@ -96,36 +139,54 @@ export default function AppLayout() {
     })();
     unreadRequest.current = task;
     return task;
-  }, [isLoggedIn]);
+  }, [isLoggedIn, t]);
 
   useEffect(() => {
     if (!isLoggedIn) {
       setUnreadNotificationCount(0);
       setUnreadMessageCount(0);
+      previousUnreadCounts.current = null;
       return;
     }
 
     let active = true;
     Promise.all([
-      getCachedUnreadNotificationCount({ excludeType: "message" }),
+      getCachedUnreadNotificationCount({ excludeType: "message,like,comment" }),
       getCachedUnreadNotificationCount({ type: "message" }),
     ]).then(([notificationCount, messageCount]) => {
       if (active) {
         if (notificationCount !== null) setUnreadNotificationCount(notificationCount);
         if (messageCount !== null) setUnreadMessageCount(messageCount);
+        if (
+          previousUnreadCounts.current === null &&
+          notificationCount !== null &&
+          messageCount !== null
+        ) {
+          previousUnreadCounts.current = {
+            notifications: Number(notificationCount) || 0,
+            messages: Number(messageCount) || 0,
+          };
+        }
       }
     });
     loadUnreadCounts();
     return () => { active = false; };
-  }, [isLoggedIn, loadUnreadCounts]);
+  }, [currentUserId, isLoggedIn, loadUnreadCounts]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") loadUnreadCounts();
     });
     const unsubscribeNetwork = subscribeNetworkRestored(() => loadUnreadCounts(true));
-    return () => { subscription.remove(); unsubscribeNetwork(); };
+    const interval = setInterval(() => {
+      if (AppState.currentState === "active") loadUnreadCounts(true);
+    }, 30000);
+    return () => { subscription.remove(); unsubscribeNetwork(); clearInterval(interval); };
   }, [loadUnreadCounts]);
+
+  useEffect(() => () => {
+    if (alertTimer.current) clearTimeout(alertTimer.current);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeNotificationsUpdated(() => {
@@ -136,34 +197,26 @@ export default function AppLayout() {
   }, [loadUnreadCounts]);
 
   const renderProfileButton = () => {
-    if (user) {
-      return (
-        <View style={styles.btnWrap}>
-          <TouchableOpacity
-            onPress={() =>
-              router.push({
-                pathname: "/profile",
-                params: { returnTo: pathname || "/home" },
-              })
-            }
-            style={styles.iconButton}
-            activeOpacity={0.85}
-          >
-            <Image source={{ uri: userAvatar }} style={styles.profileImage} />
-          </TouchableOpacity>
-          <View style={styles.profileDot} />
-        </View>
-      );
-    }
-
     return (
-      <TouchableOpacity
-        onPress={() => router.push("/(auth)/login")}
-        style={styles.loginButton}
-        activeOpacity={0.82}
-      >
-        <Text style={styles.loginButtonText}>Login</Text>
-      </TouchableOpacity>
+      <View style={styles.btnWrap}>
+        <TouchableOpacity
+          onPress={() => router.push({
+            pathname: "/account",
+            params: { returnTo: pathname || "/home" },
+          })}
+          style={styles.iconButton}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={t("Open account and preferences")}
+        >
+          {user ? (
+            <Image source={{ uri: userAvatar }} style={styles.profileImage} />
+          ) : (
+            <Ionicons name="person-outline" size={21} color={INACTIVE} />
+          )}
+        </TouchableOpacity>
+        {user ? <View style={styles.profileDot} /> : null}
+      </View>
     );
   };
 
@@ -211,14 +264,17 @@ export default function AppLayout() {
             headerLeftContainerStyle: styles.headerLeftContainer,
             headerRightContainerStyle: styles.headerRightContainer,
             headerRight: () => (
-              <View style={styles.headerActions}>{renderProfileButton()}</View>
+              <View style={styles.headerActions}>
+                {isHomeActive ? <SharedLocationFilterBar /> : null}
+                {renderProfileButton()}
+              </View>
             ),
           }}
         >
           <Tabs.Screen
             name="notifications"
             options={{
-              title: "Notifications",
+              title: t("Notifications"),
               tabBarBadge:
                 unreadNotificationCount > 0
                   ? unreadNotificationCount > 9
@@ -239,7 +295,7 @@ export default function AppLayout() {
           <Tabs.Screen
             name="messages"
             options={{
-              title: "Messages",
+              title: t("Messages"),
               tabBarBadge:
                 unreadMessageCount > 0
                   ? unreadMessageCount > 9
@@ -260,7 +316,7 @@ export default function AppLayout() {
           <Tabs.Screen
             name="home"
             options={{
-              title: "Home",
+              title: t("Home"),
               tabBarLabel: () => null,
               tabBarIcon: () => null,
               tabBarButton: (props) => (
@@ -283,7 +339,7 @@ export default function AppLayout() {
               },
             }}
             options={{
-              title: "Activity",
+              title: t("My Activity"),
               tabBarIcon: ({ color, size }) => (
                 <Ionicons name="pulse-outline" size={size} color={color} />
               ),
@@ -293,7 +349,7 @@ export default function AppLayout() {
           <Tabs.Screen
             name="myspace"
             options={{
-              title: "My Space",
+              title: t("My Space"),
               tabBarIcon: ({ color, size }) => (
                 <Ionicons name="albums-outline" size={size} color={color} />
               ),
@@ -336,7 +392,39 @@ export default function AppLayout() {
               tabBarStyle: { display: "none" },
             }}
           />
+
+          <Tabs.Screen
+            name="account"
+            options={{
+              href: null,
+              headerShown: false,
+              tabBarStyle: { display: "none" },
+            }}
+          />
         </Tabs>
+        {inAppAlert ? (
+          <TouchableOpacity
+            style={[styles.inAppAlert, { bottom: tabBarBottomInset + 78 }]}
+            activeOpacity={0.9}
+            accessibilityRole="button"
+            accessibilityLabel={`${inAppAlert.title}. ${t("Open")}`}
+            onPress={() => {
+              const destination = inAppAlert.route;
+              setInAppAlert(null);
+              if (alertTimer.current) clearTimeout(alertTimer.current);
+              router.push(destination);
+            }}
+          >
+            <View style={styles.inAppAlertIcon}>
+              <Ionicons name={inAppAlert.icon} size={20} color="#FFFFFF" />
+            </View>
+            <View style={styles.inAppAlertCopy}>
+              <Text style={styles.inAppAlertTitle}>{inAppAlert.title}</Text>
+              <Text style={styles.inAppAlertAction}>{t("Tap to view")}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={19} color="#64816D" />
+          </TouchableOpacity>
+        ) : null}
       </>
     </LocationFilterProvider>
   );
@@ -457,4 +545,36 @@ const styles = StyleSheet.create({
     borderColor: "#FFFFFF",
     zIndex: 2,
   },
+  inAppAlert: {
+    position: "absolute",
+    left: 14,
+    right: 14,
+    minHeight: 68,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D7E8DC",
+    shadowColor: "#183D25",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 20,
+  },
+  inAppAlertIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: GREEN,
+    marginRight: 11,
+  },
+  inAppAlertCopy: { flex: 1, minWidth: 0 },
+  inAppAlertTitle: { color: "#1B3021", fontSize: 14, fontWeight: "800" },
+  inAppAlertAction: { marginTop: 3, color: "#688071", fontSize: 12, fontWeight: "600" },
 });
